@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Archives & Temporary files
+*.tgz
+*.tar.gz
+*.zip
+*.log
+.DS_Store
+.cache/
+.aistudio/
+
+# Databases & Snapshots
+*.sqlite
+*.sqlite3
+*.db
+ping_*.png
+
+# Environment variables & Sensitive Credentials
+.env
+.env.*
+!.env.example
+
+# Facebook / Messenger Cookie Session Files (CRITICAL SECURITY)
+appstate_cookie.json
+.cookie.json
+*.cookie.json
+temp_appstate_cookie.json
+backup_appstate_cookie.json
+

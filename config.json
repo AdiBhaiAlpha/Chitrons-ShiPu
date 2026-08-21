@@ -1,0 +1,10 @@
+{
+  "prefix": "#",
+  "botName": "ShiPu Ai🤖",
+  "adminBot": ["10001"],
+  "developerMode": false,
+  "language": "en",
+  "database": {
+    "type": "mongodb"
+  }
+}

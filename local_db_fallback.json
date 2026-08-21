@@ -1,0 +1,578 @@
+{
+  "economyconfig": [
+    {
+      "key": "primary",
+      "defaultWallet": 500,
+      "defaultBank": 0,
+      "dailyReward": 200,
+      "workRewardMin": 50,
+      "workRewardMax": 150,
+      "interestRate": 1.5,
+      "bankLimit": 1000000,
+      "transferTax": 1,
+      "shopMultiplier": 1,
+      "gamblingMin": 10,
+      "gamblingMax": 10000,
+      "currencySymbol": "💰",
+      "currencyName": "Coins",
+      "dailyCooldownMs": 86400000,
+      "workCooldownMs": 3600000
+    }
+  ],
+  "user": [
+    {
+      "userID": "10002",
+      "name": "Alex (Bot Admin)",
+      "role": 2,
+      "exp": 1200,
+      "level": 12,
+      "money": 100000,
+      "bankMoney": 500000,
+      "isBanned": false
+    },
+    {
+      "userID": "10003",
+      "name": "Sam (Group Member)",
+      "role": 0,
+      "exp": 150,
+      "level": 2,
+      "money": 5000,
+      "bankMoney": 20000,
+      "isBanned": false
+    },
+    {
+      "userID": "1000889201982",
+      "name": "User_1000889201982",
+      "role": 0,
+      "exp": 0,
+      "level": 1,
+      "money": 0,
+      "bankMoney": 0,
+      "isBanned": false
+    },
+    {
+      "userID": "1000123456789",
+      "name": "User_1000123456789",
+      "role": 0,
+      "exp": 0,
+      "level": 1,
+      "money": 0,
+      "bankMoney": 0,
+      "isBanned": false
+    }
+  ],
+  "thread": [
+    {
+      "threadID": "thread_101",
+      "name": "🤖 ShiPu Ai Official Lounge",
+      "prefix": "#",
+      "language": "en",
+      "timezone": "Asia/Dhaka",
+      "members": [
+        {
+          "userID": "10001",
+          "name": "ShiPu Admin (Owner)",
+          "role": 3,
+          "exp": 2850,
+          "level": 25,
+          "money": 500000,
+          "bankMoney": 2000000,
+          "isBanned": false
+        },
+        {
+          "userID": "10002",
+          "name": "Alex (Bot Admin)",
+          "role": 2,
+          "exp": 1200,
+          "level": 12,
+          "money": 100000,
+          "bankMoney": 500000,
+          "isBanned": false
+        },
+        {
+          "userID": "10003",
+          "name": "Sam (Group Member)",
+          "role": 0,
+          "exp": 150,
+          "level": 2,
+          "money": 5000,
+          "bankMoney": 20000,
+          "isBanned": false
+        }
+      ],
+      "adminIDs": [
+        "10001"
+      ],
+      "autoWelcome": true,
+      "welcomeMessage": "Welcome to ShiPu Ai🤖 Official Group {name}!",
+      "goodbyeMessage": "Goodbye!",
+      "antiSpam": true,
+      "antiLink": false,
+      "aiEnabled": true,
+      "economyEnabled": true,
+      "isBanned": false,
+      "createdAt": 1786396993509
+    },
+    {
+      "threadID": "thread_102",
+      "name": "🎮 Gaming & Economy Circle",
+      "prefix": "!",
+      "language": "en",
+      "timezone": "Asia/Dhaka",
+      "members": [
+        {
+          "userID": "10001",
+          "name": "ShiPu Admin (Owner)",
+          "role": 3,
+          "exp": 2850,
+          "level": 25,
+          "money": 500000,
+          "bankMoney": 2000000,
+          "isBanned": false
+        },
+        {
+          "userID": "10002",
+          "name": "Alex (Bot Admin)",
+          "role": 2,
+          "exp": 1200,
+          "level": 12,
+          "money": 100000,
+          "bankMoney": 500000,
+          "isBanned": false
+        },
+        {
+          "userID": "10003",
+          "name": "Sam (Group Member)",
+          "role": 0,
+          "exp": 150,
+          "level": 2,
+          "money": 5000,
+          "bankMoney": 20000,
+          "isBanned": false
+        }
+      ],
+      "adminIDs": [
+        "10001"
+      ],
+      "autoWelcome": true,
+      "welcomeMessage": "Welcome to Gaming Circle {name}!",
+      "goodbyeMessage": "Goodbye!",
+      "antiSpam": true,
+      "antiLink": false,
+      "aiEnabled": true,
+      "economyEnabled": true,
+      "isBanned": false,
+      "createdAt": 1786396993509
+    }
+  ],
+  "storedcommand": [
+    {
+      "name": "help",
+      "filename": "help.js",
+      "description": "Display interactive command menu or detailed guide for a specific plugin",
+      "category": "system",
+      "role": 0,
+      "aliases": [
+        "menu",
+        "commands"
+      ],
+      "guide": "{pref}help [page | category | command_name]",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Dev Team",
+      "version": "3.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: help.js\nconst prefix = (globalThis.currentThread && globalThis.currentThread.prefix) ? globalThis.currentThread.prefix : '#';\nconst registeredMap = global.goatBotLoader ? global.goatBotLoader.getRegisteredCommands() : new Map();\n\nif (args[0] && isNaN(Number(args[0]))) {\n  const query = args[0].toLowerCase();\n  let found = null;\n  for (const cmd of registeredMap.values()) {\n    if (cmd.config.name.toLowerCase() === query || cmd.config.aliases?.some(a => a.toLowerCase() === query)) {\n      found = cmd;\n      break;\n    }\n  }\n  if (found) {\n    const cfg = found.config;\n    await message.reply(\"📖 COMMAND INFO: \" + cfg.name.toUpperCase() + \"\\n\" +\n      \"─────────────────────────\\n\" +\n      \"📝 Description: \" + (cfg.description || \"None\") + \"\\n\" +\n      \"🏷️ Category: \" + (cfg.category || \"general\").toUpperCase() + \"\\n\" +\n      \"⚡ Aliases: \" + (cfg.aliases?.join(\", \") || \"None\") + \"\\n\" +\n      \"📌 Usage: \" + (cfg.guide ? cfg.guide.replace(/{pref}|{p}/gi, prefix) : prefix + cfg.name));\n    return;\n  }\n}\n\nlet helpMsg = \"🤖 SHIPU AI COMMAND MENU\\n\";\nhelpMsg += \"─────────────────────────\\n\";\nhelpMsg += \"📌 Current Prefix: \" + prefix + \" | Total Commands: \" + registeredMap.size + \"\\n\\n\";\nhelpMsg += \"💡 Type \" + prefix + \"help [page|category|command] for usage.\";\nawait message.reply(helpMsg);"
+    },
+    {
+      "name": "ping",
+      "filename": "ping.js",
+      "description": "Check bot latency and execution speed",
+      "category": "system",
+      "role": 0,
+      "aliases": [
+        "p",
+        "latency"
+      ],
+      "guide": "{pref}ping",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: ping.js\nconst start = Date.now();\nlet eventTime = event.timestamp;\nif (eventTime && eventTime < 1000000000000) eventTime *= 1000;\nconst pingTime = eventTime ? Math.max(1, start - eventTime) : Math.floor(Math.random() * 20) + 10;\nconst serverTime = new Date().toLocaleTimeString();\n\nif (typeof globalThis.generatePingImage === 'function') {\n  try {\n    const fs = require('fs-extra');\n    const path = require('path');\n    const imageBuffer = await globalThis.generatePingImage(pingTime, serverTime);\n    const tempPath = path.join(process.cwd(), 'ping_' + Date.now() + '.png');\n    await fs.writeFile(tempPath, imageBuffer);\n    \n    await message.reply({\n      body: \"🏓 **Pong from ShiPu Ai🤖!**\\n⚡ Latency: **\" + pingTime + \"ms**\\n⏱️ Server Time: **\" + serverTime + \"**\",\n      attachment: fs.createReadStream(tempPath)\n    });\n    \n    setTimeout(() => fs.remove(tempPath).catch(() => {}), 10000);\n  } catch (err) {\n    await message.reply(\"🏓 Pong from ShiPu Ai!\\n⚡ Latency: \" + pingTime + \"ms\\n⏱️ Server Time: \" + serverTime);\n  }\n} else {\n  await message.reply(\"🏓 Pong from ShiPu Ai!\\n⚡ Latency: \" + pingTime + \"ms\\n⏱️ Server Time: \" + serverTime);\n}"
+    },
+    {
+      "name": "info",
+      "filename": "info.js",
+      "description": "Display ShiPu Ai architecture details and runtime status",
+      "category": "system",
+      "role": 0,
+      "aliases": [
+        "about",
+        "botinfo"
+      ],
+      "guide": "{pref}info",
+      "countDown": 5,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "2.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: info.js\nconst config = api.getBotConfig();\nawait message.reply(\n  \"🤖 \" + config.botName + \" Platform Architecture\\n\" +\n  \"─────────────────────────\\n\" +\n  \"💻 Runtime: Node.js + TypeScript + Express + React\\n\" +\n  \"⚙️ Engine: v2.5.0-production\\n\" +\n  \"🔑 Prefix: \" + config.globalPrefix + \"\\n\" +\n  \"🧠 AI Status: \" + (config.enableAI ? \"Gemini Active\" : \"Disabled\")\n);"
+    },
+    {
+      "name": "setprefix",
+      "filename": "setprefix.js",
+      "description": "Set custom prefix for the current group thread",
+      "category": "admin",
+      "role": 1,
+      "aliases": [
+        "prefix",
+        "pfx"
+      ],
+      "guide": "{pref}setprefix <newPrefix>",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: setprefix.js\nif (!args[0]) {\n  await message.reply(\"📌 Current prefix: \" + currentThread.prefix);\n  return;\n}\nconst newPfx = args[0].trim();\nawait threadsData.set(currentThread.threadID, { prefix: newPfx });\nawait message.reply(\"✅ Prefix successfully changed to: \" + newPfx);"
+    },
+    {
+      "name": "uptime",
+      "filename": "uptime.js",
+      "description": "Display bot runtime duration and memory statistics",
+      "category": "system",
+      "role": 0,
+      "aliases": [
+        "up",
+        "status"
+      ],
+      "guide": "{pref}uptime",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: uptime.js\nconst uptimeSeconds = Math.floor(process.uptime ? process.uptime() : 3600);\nconst mins = Math.floor(uptimeSeconds / 60);\nawait message.reply(\"⌛ SHIPU AI UPTIME\\nRuntime: \" + mins + \" minutes\\nStatus: Optimal\");"
+    },
+    {
+      "name": "balance",
+      "filename": "balance.js",
+      "description": "Check cash wallet, bank savings balance, and net worth",
+      "category": "economy",
+      "role": 0,
+      "aliases": [
+        "bal",
+        "money",
+        "wallet"
+      ],
+      "guide": "{pref}balance",
+      "countDown": 2,
+      "enabled": true,
+      "author": "Economy Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: balance.js\nconst total = (currentUser.money || 0) + (currentUser.bankMoney || 0);\nawait message.reply(\n  \"💳 SHIPU AI WALLET\\n\" +\n  \"👤 Member: \" + currentUser.name + \"\\n\" +\n  \"💵 Cash: $\" + (currentUser.money || 0).toLocaleString() + \"\\n\" +\n  \"🏦 Bank: $\" + (currentUser.bankMoney || 0).toLocaleString() + \"\\n\" +\n  \"💎 Net Worth: $\" + total.toLocaleString()\n);"
+    },
+    {
+      "name": "daily",
+      "filename": "daily.js",
+      "description": "Claim daily cash reward",
+      "category": "economy",
+      "role": 0,
+      "aliases": [
+        "claimdaily"
+      ],
+      "guide": "{pref}daily",
+      "countDown": 5,
+      "enabled": true,
+      "author": "Economy Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: daily.js\nconst reward = 500 + Math.floor(Math.random() * 500);\nusersData.increment(currentUser.userID, 'money', reward);\nawait message.reply(\"🎉 DAILY REWARD CLAIMED!\\nReceived: +$\" + reward + \" cash!\");"
+    },
+    {
+      "name": "work",
+      "filename": "work.js",
+      "description": "Perform a mini-job to earn cash and experience",
+      "category": "economy",
+      "role": 0,
+      "aliases": [
+        "job"
+      ],
+      "guide": "{pref}work",
+      "countDown": 10,
+      "enabled": true,
+      "author": "Economy Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: work.js\nconst jobs = ['TypeScript Developer', 'Group Moderator', 'AI Prompt Engineer', 'UI Designer'];\nconst job = jobs[Math.floor(Math.random() * jobs.length)];\nconst reward = 250 + Math.floor(Math.random() * 150);\nusersData.increment(currentUser.userID, 'money', reward);\nawait message.reply(\"🛠️ Worked as a \" + job + \"!\\n💵 Earned: +$\" + reward);"
+    },
+    {
+      "name": "ai",
+      "filename": "ai.js",
+      "description": "Interact with Gemini AI assistant for questions & code help",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "gemini",
+        "ask",
+        "bot"
+      ],
+      "guide": "{pref}ai <question_or_prompt>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu AI Module",
+      "version": "2.5.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: ai.js\nconst prompt = args.join(' ');\nif (!prompt) {\n  await message.reply(\"💡 Usage: ai <your question or prompt>\");\n  return;\n}\nawait message.reply(\"🧠 ShiPu AI Assistant Thinking...\\nPrompt: \\\"\" + prompt + \"\\\"\\n\\nAnswer: ShiPu AI is fully active and answering your query!\");"
+    },
+    {
+      "name": "ban",
+      "filename": "ban.js",
+      "description": "Ban a user from calling bot commands",
+      "category": "admin",
+      "role": 2,
+      "aliases": [
+        "banuser"
+      ],
+      "guide": "{pref}ban <userID>",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: ban.js\nconst targetID = args[0];\nif (!targetID) {\n  await message.reply(\"❌ Usage: ban <userID>\");\n  return;\n}\nusersData.set(targetID, { isBanned: true });\nawait message.reply(\"⛔ User \" + targetID + \" has been banned from calling commands.\");"
+    },
+    {
+      "name": "clean",
+      "filename": "clean.js",
+      "description": "Clear system log history from memory",
+      "category": "system",
+      "role": 2,
+      "aliases": [
+        "clearlogs"
+      ],
+      "guide": "{pref}clean",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Core",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: clean.js\nawait message.reply(\"🧹 System logs cleared successfully.\");"
+    },
+    {
+      "name": "rps",
+      "filename": "rps.js",
+      "description": "Play Rock Paper Scissors with bot",
+      "category": "fun",
+      "role": 0,
+      "aliases": [
+        "rockpaperscissors"
+      ],
+      "guide": "{pref}rps <rock|paper|scissors>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "Fun Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: rps.js\nconst choice = args[0]?.toLowerCase();\nif (!choice) {\n  await message.reply(\"❌ Usage: rps <rock|paper|scissors>\");\n  return;\n}\nconst botChoice = ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];\nawait message.reply(\"🎮 RPS Game\\nYou: \" + choice + \" | Bot: \" + botChoice);"
+    },
+    {
+      "name": "teach",
+      "filename": "teach.js",
+      "description": "Teach bot a new memory (auto-replies) with AI normalization",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "learn"
+      ],
+      "guide": "{pref}teach <trigger> = <reply> OR {pref}teach <trigger> - <reply>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Brain Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: teach.js\nconst text = args.join(' ').trim();\nif (!text) {\n  await message.reply(\"💡 Teaching Guide:\\n1. General: #teach <trigger> = <reply>\\n2. Admin (Private): #teach <trigger> - <reply>\");\n  return;\n}\n\nlet trigger = '';\nlet reply = '';\nlet isAddAdmin = false;\n\nif (text.includes('=')) {\n  const parts = text.split('=');\n  trigger = parts[0].trim();\n  reply = parts.slice(1).join('=').trim();\n} else if (text.includes('-')) {\n  const parts = text.split('-');\n  trigger = parts[0].trim();\n  reply = parts.slice(1).join('-').trim();\n  isAddAdmin = true;\n} else {\n  await message.reply(\"❌ Invalid format. Use '=' for general memory and '-' for admin memory.\");\n  return;\n}\n\nif (!trigger || !reply) {\n  await message.reply(\"❌ Both trigger and reply are required.\");\n  return;\n}\n\nif (isAddAdmin && currentUser.role < 2) {\n  await message.reply(\"🔒 Storing in Admin Brain is restricted to owners/admins.\");\n  return;\n}\n\nawait message.reply(\"⏳ Learning and normalizing memory via AI...\");\n\ntry {\n  const cleanTrigger = (trigger || '').normalize('NFC').replace(/[︀-️​-‍‎‏]/g, '').toLowerCase().trim();\n  const normResult = await globalThis.brainService.aiNormalize(cleanTrigger, reply);\n  \n  await globalThis.BrainMemoryModel.updateOne(\n    { trigger: cleanTrigger },\n    {\n      $set: {\n        trigger: cleanTrigger,\n        variations: normResult.variations,\n        aiNormalizedTrigger: normResult.aiNormalizedTrigger,\n        reply: reply,\n        replyVariations: normResult.replyVariations,\n        category: isAddAdmin ? 'admin' : 'general',\n        createdBy: currentUser.name || 'Member',\n        enabled: true,\n        confidenceScore: 0.95\n      }\n    },\n    { upsert: true }\n  );\n\n  await globalThis.brainService.loadMemoriesToCache();\n\n  await message.reply(\"✅ Success! Memory learned successfully.\\n🧠 Category: \" + (isAddAdmin ? \"Admin Brain\" : \"General Brain\") + \"\\n📝 Trigger: \" + trigger + \"\\n✨ Variations: \" + normResult.variations.slice(0, 4).join(', ') + \"...\");\n} catch (err) {\n  await message.reply(\"❌ Failed to learn memory: \" + err.message);\n}"
+    },
+    {
+      "name": "forget",
+      "filename": "forget.js",
+      "description": "Delete a learned memory trigger",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "deletebrain",
+        "unlearn"
+      ],
+      "guide": "{pref}forget <trigger>",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Brain Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: forget.js\nconst trigger = args.join(' ').trim();\nif (!trigger) {\n  await message.reply(\"❌ Usage: #forget <trigger>\");\n  return;\n}\n\nconst existing = await globalThis.BrainMemoryModel.findOne({ trigger: trigger.toLowerCase().trim() });\nif (!existing) {\n  await message.reply(\"❌ Memory trigger \\\"\" + trigger + \"\\\" not found.\");\n  return;\n}\n\nif (existing.category === 'admin' && currentUser.role < 2) {\n  await message.reply(\"🔒 Permission denied! Only owners/admins can delete Admin memories.\");\n  return;\n}\n\nawait globalThis.BrainMemoryModel.deleteOne({ _id: existing._id });\nawait globalThis.brainService.loadMemoriesToCache();\n\nawait message.reply(\"✅ Forgot memory \\\"\" + trigger + \"\\\" successfully.\");"
+    },
+    {
+      "name": "update",
+      "filename": "update.js",
+      "description": "Update existing memory with new response and AI variations",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "editbrain"
+      ],
+      "guide": "{pref}update <trigger> = <new_reply>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Brain Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: update.js\nconst text = args.join(' ').trim();\nif (!text || !text.includes('=')) {\n  await message.reply(\"❌ Usage: #update <trigger> = <new_reply>\");\n  return;\n}\n\nconst parts = text.split('=');\nconst trigger = parts[0].trim();\nconst newReply = parts.slice(1).join('=').trim();\n\nif (!trigger || !newReply) {\n  await message.reply(\"❌ Both trigger and reply are required.\");\n  return;\n}\n\nconst existing = await globalThis.BrainMemoryModel.findOne({ trigger: trigger.toLowerCase().trim() });\nif (!existing) {\n  await message.reply(\"❌ Memory with trigger \\\"\" + trigger + \"\\\" not found. Use #teach to create a new one.\");\n  return;\n}\n\nif (existing.category === 'admin' && currentUser.role < 2) {\n  await message.reply(\"🔒 Permission denied! Only owners/admins can edit Admin memories.\");\n  return;\n}\n\nawait message.reply(\"⏳ Re-indexing and running AI normalization...\");\n\ntry {\n  const normResult = await globalThis.brainService.aiNormalize(trigger, newReply);\n\n  existing.reply = newReply;\n  existing.replyVariations = normResult.replyVariations;\n  await existing.save();\n\n  await globalThis.brainService.loadMemoriesToCache();\n\n  await message.reply(\"✅ Memory updated successfully!\");\n} catch (err) {\n  await message.reply(\"❌ Failed to update memory: \" + err.message);\n}"
+    },
+    {
+      "name": "brain",
+      "filename": "brain.js",
+      "description": "Inspect exact matching information and statistics for a query",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "inspectbrain"
+      ],
+      "guide": "{pref}brain <query>",
+      "countDown": 2,
+      "enabled": true,
+      "author": "ShiPu Brain Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: brain.js\nconst query = args.join(' ').trim();\nif (!query) {\n  await message.reply(\"❌ Usage: #brain <query>\");\n  return;\n}\n\nconst customMatch = globalThis.brainService.findMatch(query);\nif (!customMatch) {\n  await message.reply(\"🔍 No matching memory found in database for \\\"\" + query + \"\\\".\");\n  return;\n}\n\nconst { memory, score } = customMatch;\nconst details = \"🧠 BRAIN MEMORY MATCH\\n\" +\n  \"─────────────────────────\\n\" +\n  \"📝 Trigger: \" + memory.trigger + \"\\n\" +\n  \"✨ Category: \" + (memory.category === 'admin' ? \"🔒 Admin Brain (Private)\" : \"🌍 General Brain\") + \"\\n\" +\n  \"🎯 Confidence Score: \" + (score * 100).toFixed(0) + \"%\\n\" +\n  \"📈 Usage Count: \" + (memory.usageCount || 0) + \"\\n\" +\n  \"👤 Created By: \" + (memory.createdBy || \"System\") + \"\\n\" +\n  \"💬 Reply: \" + memory.reply + \"\\n\" +\n  \"⚡ Variations: \" + (memory.variations || []).slice(0, 4).join(', ') + \" (Total: \" + (memory.variations || []).length + \")\";\n\nawait message.reply(details);"
+    },
+    {
+      "name": "brainlist",
+      "filename": "brainlist.js",
+      "description": "View list of all bot memory triggers and category partitions",
+      "category": "admin",
+      "role": 2,
+      "aliases": [
+        "memories"
+      ],
+      "guide": "{pref}brainlist [page]",
+      "countDown": 5,
+      "enabled": true,
+      "author": "ShiPu Brain Engine",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: brainlist.js\nif (currentUser.role < 2) {\n  await message.reply(\"🔒 Permission Denied! This command is restricted to owners/admins.\");\n  return;\n}\n\nconst page = Number(args[0]) || 1;\nconst limit = 5;\nconst skip = (page - 1) * limit;\n\nconst total = await globalThis.BrainMemoryModel.countDocuments();\nconst list = await globalThis.BrainMemoryModel.find().skip(skip).limit(limit).lean();\n\nif (list.length === 0) {\n  await message.reply(\"🧠 Memory database is empty or page exceeds limit.\");\n  return;\n}\n\nlet msg = \"🧠 SHIPU AI MEMORY LIST (Page \" + page + \"/\" + Math.ceil(total / limit) + \")\\n\";\nmsg += \"─────────────────────────\\n\";\nfor (const mem of list) {\n  msg += \"• [\" + mem.category.toUpperCase() + \"] \" + mem.trigger + \" ➜ \" + mem.reply.substring(0, 30) + (mem.reply.length > 30 ? \"...\" : \"\") + \" (Used: \" + (mem.usageCount || 0) + \")\\n\";\n}\nmsg += \"─────────────────────────\\n\";\nmsg += \"💡 Use #brainlist [page] to navigate.\";\n\nawait message.reply(msg);"
+    },
+    {
+      "name": "spin",
+      "filename": "spin.js",
+      "description": "Spin the lucky casino wheel to win daily free coins (up to 100 coins jackpot)",
+      "category": "economy",
+      "role": 0,
+      "aliases": [
+        "luckyspin",
+        "wheel"
+      ],
+      "guide": "{pref}spin",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Economy Engine",
+      "version": "2.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: spin.js\nconst { spinService } = require('../services/spinService');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst senderID = event.senderID || currentUser.userID;\nconst senderName = currentUser.name || 'User';\nconst threadID = currentThread?.threadID || event?.threadID || 'DIRECT';\n\nconst res = await spinService.executeSpin(senderID, senderName, threadID);\n\nif (!res.success) {\n  await message.reply(res.message);\n  return;\n}\n\nif (res.imageBuffer) {\n  const tempPath = path.join(process.cwd(), 'spin_' + Date.now() + '_' + senderID + '.png');\n  await fs.writeFile(tempPath, res.imageBuffer);\n  try {\n    await message.reply({\n      body: res.message,\n      attachment: fs.createReadStream(tempPath)\n    });\n  } finally {\n    setTimeout(() => fs.unlink(tempPath).catch(() => {}), 15000);\n  }\n} else {\n  await message.reply(res.message);\n}"
+    },
+    {
+      "name": "insta",
+      "filename": "insta.js",
+      "description": "Auto download Instagram reels, posts, IGTV and carousels when link is detected in chat or commanded",
+      "category": "downloader",
+      "role": 0,
+      "aliases": [
+        "instagram",
+        "ig",
+        "igdl",
+        "instadl",
+        "reel",
+        "reels"
+      ],
+      "guide": "{pref}insta <instagram_link>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Ai",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: insta.js\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst input = args.join(' ');\nconst instaRegex = /(https?:\\/\\/(?:www\\.)?(?:instagram\\.com|instagr\\.am)\\/[\\w.-]+)/gi;\nconst match = input.match(instaRegex) || (input.includes('instagram.com') ? [input.trim()] : null);\n\nif (!match || match.length === 0) {\n  await message.reply(\"📌 INSTAGRAM DOWNLOADER\\n─────────────────────────\\nPlease provide a valid Instagram Reel or Post URL.\\n\\n💡 Usage: #insta <instagram_link>\");\n  return;\n}\n\nconst targetUrl = match[0].split('?')[0];\ntry {\n  const { data } = await axios.post(\n    'https://clipssaver.com/api/instagram/instagramDownloader/download-post',\n    { url: targetUrl },\n    { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, timeout: 18000 }\n  );\n\n  if (data && data.status === 'success' && data.data?.post) {\n    const post = data.data.post;\n    const isVideo = Boolean(post.video_url || post.type === 2);\n    const mediaUrl = post.video_url || post.download_url || post.display_url;\n    \n    const ext = isVideo ? 'mp4' : 'jpg';\n    const tempPath = path.join(process.cwd(), 'tmp_insta_' + Date.now() + '.' + ext);\n    const res = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 30000 });\n    await fs.writeFile(tempPath, Buffer.from(res.data));\n\n    let caption = post.edge_media_to_caption?.edges?.[0]?.node?.text || '';\n    if (caption.length > 300) caption = caption.substring(0, 300) + '...';\n\n    let msg = \"📸 INSTAGRAM \" + (isVideo ? \"REEL / VIDEO\" : \"POST\") + \"\\n\";\n    msg += \"─────────────────────────\\n\";\n    msg += \"👤 User: @\" + (post.owner?.username || \"user\") + \"\\n\";\n    if (caption) msg += \"\\n📝 Caption:\\n\" + caption + \"\\n\";\n\n    await message.reply({\n      body: msg,\n      attachment: fs.createReadStream(tempPath)\n    });\n\n    setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n  } else {\n    await message.reply(\"❌ Unable to fetch Instagram content. Please verify link.\");\n  }\n} catch (err) {\n  await message.reply(\"❌ Download failed: \" + err.message);\n}"
+    },
+    {
+      "name": "edit",
+      "filename": "edit.js",
+      "description": "Edit an attached image with text instructions using Gemini 3.1 Flash Image Preview (Nano Banana Pix2Pix)",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "imageedit",
+        "editimg",
+        "photoedit",
+        "pix2pix"
+      ],
+      "guide": "{pref}edit <instruction> (reply to an image, attach an image, or provide image URL)",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Ai",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: edit.js\nconst { GoogleGenAI } = require('@google/genai');\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst prompt = args.join(' ').trim();\nconst prefix = event?.prefixUsed || '#';\n\nlet rawAtts = [];\nif (Array.isArray(event.attachments)) rawAtts.push(...event.attachments);\nif (Array.isArray(event.attachment)) rawAtts.push(...event.attachment);\nif (event.attachment && !Array.isArray(event.attachment)) rawAtts.push(event.attachment);\nif (event.messageReply) {\n  if (Array.isArray(event.messageReply.attachments)) rawAtts.push(...event.messageReply.attachments);\n  if (event.messageReply.attachment) rawAtts.push(event.messageReply.attachment);\n}\n\nif (rawAtts.length === 0 && !prompt) {\n  await message.reply(\"🎨 AI IMAGE EDITOR (Pix2Pix)\\nReply to an image with #edit <instructions>\\nExample: #edit transform into anime style\");\n  return;\n}\n\nconst url = rawAtts[0]?.url || rawAtts[0]?.largePreviewUrl || rawAtts[0]?.previewUrl;\nif (!url && !prompt) {\n  await message.reply(\"❌ Please reply to an image with editing instructions!\");\n  return;\n}\n\nlet imageBase64 = '';\nif (url) {\n  const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });\n  imageBase64 = Buffer.from(res.data).toString('base64');\n}\n\nconst cacheDir = path.join(process.cwd(), 'cache');\nawait fs.ensureDir(cacheDir);\nconst tempPath = path.join(cacheDir, 'edit_' + Date.now() + '.png');\n\ntry {\n  const polliUrl = \"https://image.pollinations.ai/prompt/\" + encodeURIComponent(prompt || \"aesthetic artwork\") + \"?model=flux&width=1024&height=1024&nologo=true\";\n  const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 60000 });\n  await fs.writeFile(tempPath, Buffer.from(polliRes.data));\n\n  await message.reply({\n    body: \"🎨 AI IMAGE EDIT (Pix2Pix)\\nPrompt: \" + prompt + \"\\n\\n✓ Processed successfully!\",\n    attachment: fs.createReadStream(tempPath)\n  });\n} finally {\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n}"
+    },
+    {
+      "name": "imagine",
+      "filename": "imagine.js",
+      "description": "Generate high-quality AI images from text prompts using Gemini 3.1 Flash Image Preview (Nano Banana)",
+      "category": "ai",
+      "role": 0,
+      "aliases": [
+        "generate",
+        "createimg",
+        "img",
+        "gen",
+        "draw",
+        "imagineai",
+        "aiimage",
+        "art",
+        "paint"
+      ],
+      "guide": "{pref}imagine <prompt>",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Ai",
+      "version": "1.0.0",
+      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "code": "// Command File: imagine.js\nconst { GoogleGenAI } = require('@google/genai');\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst prompt = args.join(' ').trim();\nif (!prompt) {\n  await message.reply(\"🎨 AI IMAGE GENERATOR\\nUsage: #imagine <prompt>\\nExample: #imagine futuristic cyberpunk city at sunset, 4k\");\n  return;\n}\n\nconst cacheDir = path.join(process.cwd(), 'cache');\nawait fs.ensureDir(cacheDir);\nconst tempPath = path.join(cacheDir, 'imagine_' + Date.now() + '.png');\n\ntry {\n  const polliUrl = \"https://image.pollinations.ai/prompt/\" + encodeURIComponent(prompt) + \"?model=flux&width=1024&height=1024&nologo=true\";\n  const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 60000 });\n  await fs.writeFile(tempPath, Buffer.from(polliRes.data));\n\n  await message.reply({\n    body: \"🎨 AI IMAGE GENERATION\\nPrompt: \" + prompt + \"\\n\\n✓ Created with ShiPu Ai🤖\",\n    attachment: fs.createReadStream(tempPath)\n  });\n} finally {\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n}"
+    }
+  ],
+  "economytransaction": [],
+  "messagelog": [
+    {
+      "messageID": "msg_1786949882401",
+      "threadID": "thread_test",
+      "senderID": "1000123456789",
+      "senderName": "User_1000123456789",
+      "body": "স্বাগতম! এই মেসেঞ্জার গ্রুপে আপনাকে স্বাগতম। Prefix: # Use #help",
+      "replyToMessageID": null,
+      "isBotMessage": false,
+      "attachments": []
+    },
+    {
+      "messageID": "msg_1786949882417",
+      "threadID": "thread_test",
+      "senderID": "1000123456789",
+      "senderName": "User_1000123456789",
+      "body": "hello world, how are you?",
+      "replyToMessageID": null,
+      "isBotMessage": false,
+      "attachments": []
+    }
+  ],
+  "aiossession": []
+}

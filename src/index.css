@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@layer base {
+  *, ::before, ::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    background-color: #020617;
+  }
+}
+
+/* GPU & CPU Acceleration Helpers */
+.gpu-accelerated {
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optimize Paint Layers */
+.card-surface {
+  transform: translateZ(0);
+  contain: layout style paint;
+}
+
+/* Smooth active button feedback without lag */
+button, a {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}
+

@@ -1,0 +1,8 @@
+{
+  "name": "ShiPu Ai Admin Dashboard",
+  "description": "ShiPu Ai - Production-Ready Messenger Group Chat Bot Architecture, Plugin System, Admin Dashboard and Messenger Adapter",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

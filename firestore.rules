@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection rules
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Threads collection rules
+    match /threads/{threadId} {
+      allow read, write: if true;
+    }
+
+    // Global settings collection rules
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Audit logs rules
+    match /auditLogs/{logId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
