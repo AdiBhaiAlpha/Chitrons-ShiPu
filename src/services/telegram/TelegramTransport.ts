@@ -33,7 +33,8 @@ export class TelegramTransport {
     method: string,
     payload?: any,
     signal?: AbortSignal,
-    timeoutMs: number = 35000
+    timeoutMs: number = 35000,
+    isFormData: boolean = false
   ): Promise<TelegramApiResponse<T>> {
     const url = `https://api.telegram.org/bot${this.token}/${method}`;
     const controller = new AbortController();
@@ -51,6 +52,21 @@ export class TelegramTransport {
     }
 
     try {
+      if (isFormData && payload) {
+        const axios = (await import('axios')).default;
+        const headers = typeof payload.getHeaders === 'function' ? payload.getHeaders() : {};
+        const response = await axios.post(url, payload, {
+          headers: {
+            ...headers,
+            'User-Agent': 'ShiPu-AI-Telegram-Transport/2.5'
+          },
+          timeout: timeoutMs,
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        return response.data as TelegramApiResponse<T>;
+      }
+
       const headers: Record<string, string> = {
         'User-Agent': 'ShiPu-AI-Telegram-Transport/2.5'
       };
@@ -156,62 +172,186 @@ export class TelegramTransport {
 
   public async sendPhoto(
     chatId: number | string,
-    photoUrl: string,
+    photoSource: string | Buffer | any,
     caption?: string,
     replyToMessageId?: number | string
   ): Promise<TelegramApiResponse<any>> {
-    const payload: any = {
-      chat_id: chatId,
-      photo: photoUrl
-    };
-    if (caption) payload.caption = caption;
-    if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
-
     try {
+      // Check if it's a Buffer or Readable stream
+      if (Buffer.isBuffer(photoSource) || (photoSource && typeof photoSource.pipe === 'function')) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('photo', photoSource, { filename: (photoSource as any)?.path ? (await import('path')).basename((photoSource as any).path) : 'photo.jpg' });
+
+        return await this.callApi('sendPhoto', form, undefined, 30000, true);
+      }
+
+      const photoStr = String(photoSource);
+      const fs = (await import('fs-extra')).default;
+      const path = (await import('path')).default;
+
+      if (!photoStr.startsWith('http://') && !photoStr.startsWith('https://') && await fs.pathExists(photoStr)) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('photo', fs.createReadStream(photoStr), { filename: path.basename(photoStr) });
+        return await this.callApi('sendPhoto', form, undefined, 30000, true);
+      }
+
+      const payload: any = {
+        chat_id: chatId,
+        photo: photoStr
+      };
+      if (caption) payload.caption = caption;
+      if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+
       return await this.callApi('sendPhoto', payload, undefined, 25000);
     } catch (err: any) {
-      // Fallback: send as text message containing photo link if photo upload fails
-      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}📷 ${photoUrl}`, { replyToMessageId });
+      telegramLogger.warn('API_ERROR', `sendPhoto failed: ${err?.message || err}`);
+      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}${typeof photoSource === 'string' ? `📷 ${photoSource}` : ''}`, { replyToMessageId });
     }
   }
 
   public async sendDocument(
     chatId: number | string,
-    documentUrl: string,
+    docSource: string | Buffer | any,
     caption?: string,
     replyToMessageId?: number | string
   ): Promise<TelegramApiResponse<any>> {
-    const payload: any = {
-      chat_id: chatId,
-      document: documentUrl
-    };
-    if (caption) payload.caption = caption;
-    if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
-
     try {
+      if (Buffer.isBuffer(docSource) || (docSource && typeof docSource.pipe === 'function')) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('document', docSource, { filename: (docSource as any)?.path ? (await import('path')).basename((docSource as any).path) : 'document.bin' });
+
+        return await this.callApi('sendDocument', form, undefined, 35000, true);
+      }
+
+      const docStr = String(docSource);
+      const fs = (await import('fs-extra')).default;
+      const path = (await import('path')).default;
+
+      if (!docStr.startsWith('http://') && !docStr.startsWith('https://') && await fs.pathExists(docStr)) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('document', fs.createReadStream(docStr), { filename: path.basename(docStr) });
+        return await this.callApi('sendDocument', form, undefined, 35000, true);
+      }
+
+      const payload: any = {
+        chat_id: chatId,
+        document: docStr
+      };
+      if (caption) payload.caption = caption;
+      if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+
       return await this.callApi('sendDocument', payload, undefined, 30000);
     } catch (err: any) {
-      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}📁 ${documentUrl}`, { replyToMessageId });
+      telegramLogger.warn('API_ERROR', `sendDocument failed: ${err?.message || err}`);
+      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}${typeof docSource === 'string' ? `📁 ${docSource}` : ''}`, { replyToMessageId });
     }
   }
 
   public async sendVideo(
     chatId: number | string,
-    videoUrl: string,
+    videoSource: string | Buffer | any,
     caption?: string,
     replyToMessageId?: number | string
   ): Promise<TelegramApiResponse<any>> {
-    const payload: any = {
-      chat_id: chatId,
-      video: videoUrl
-    };
-    if (caption) payload.caption = caption;
-    if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
-
     try {
+      if (Buffer.isBuffer(videoSource) || (videoSource && typeof videoSource.pipe === 'function')) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('video', videoSource, { filename: (videoSource as any)?.path ? (await import('path')).basename((videoSource as any).path) : 'video.mp4' });
+
+        return await this.callApi('sendVideo', form, undefined, 45000, true);
+      }
+
+      const videoStr = String(videoSource);
+      const fs = (await import('fs-extra')).default;
+      const path = (await import('path')).default;
+
+      if (!videoStr.startsWith('http://') && !videoStr.startsWith('https://') && await fs.pathExists(videoStr)) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('video', fs.createReadStream(videoStr), { filename: path.basename(videoStr) });
+        return await this.callApi('sendVideo', form, undefined, 45000, true);
+      }
+
+      const payload: any = {
+        chat_id: chatId,
+        video: videoStr
+      };
+      if (caption) payload.caption = caption;
+      if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+
       return await this.callApi('sendVideo', payload, undefined, 30000);
     } catch (err: any) {
-      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}🎥 ${videoUrl}`, { replyToMessageId });
+      telegramLogger.warn('API_ERROR', `sendVideo failed: ${err?.message || err}`);
+      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}${typeof videoSource === 'string' ? `🎥 ${videoSource}` : ''}`, { replyToMessageId });
+    }
+  }
+
+  public async sendAudio(
+    chatId: number | string,
+    audioSource: string | Buffer | any,
+    caption?: string,
+    replyToMessageId?: number | string
+  ): Promise<TelegramApiResponse<any>> {
+    try {
+      if (Buffer.isBuffer(audioSource) || (audioSource && typeof audioSource.pipe === 'function')) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('audio', audioSource, { filename: (audioSource as any)?.path ? (await import('path')).basename((audioSource as any).path) : 'audio.mp3' });
+
+        return await this.callApi('sendAudio', form, undefined, 35000, true);
+      }
+
+      const audioStr = String(audioSource);
+      const fs = (await import('fs-extra')).default;
+      const path = (await import('path')).default;
+
+      if (!audioStr.startsWith('http://') && !audioStr.startsWith('https://') && await fs.pathExists(audioStr)) {
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('chat_id', String(chatId));
+        if (caption) form.append('caption', caption);
+        if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
+        form.append('audio', fs.createReadStream(audioStr), { filename: path.basename(audioStr) });
+        return await this.callApi('sendAudio', form, undefined, 35000, true);
+      }
+
+      const payload: any = {
+        chat_id: chatId,
+        audio: audioStr
+      };
+      if (caption) payload.caption = caption;
+      if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+
+      return await this.callApi('sendAudio', payload, undefined, 30000);
+    } catch (err: any) {
+      telegramLogger.warn('API_ERROR', `sendAudio failed: ${err?.message || err}`);
+      return this.sendMessage(chatId, `${caption ? `${caption}\n` : ''}${typeof audioSource === 'string' ? `🎵 ${audioSource}` : ''}`, { replyToMessageId });
     }
   }
 

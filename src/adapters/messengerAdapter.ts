@@ -1,12 +1,12 @@
 import { ShiPuBotResponse, ShiPuThread, ShiPuUser } from '../types/shipu';
 
 export interface MessengerAdapter {
-  sendMessage(threadID: string, text: string, attachments?: string[]): Promise<ShiPuBotResponse>;
+  sendMessage(threadID: string, text: string, attachments?: any): Promise<ShiPuBotResponse>;
   reply(threadID: string, messageID: string, text: string): Promise<ShiPuBotResponse>;
   react(messageID: string, emoji: string): Promise<void>;
-  sendImage(threadID: string, url: string): Promise<ShiPuBotResponse>;
-  sendVideo(threadID: string, url: string): Promise<ShiPuBotResponse>;
-  sendFile(threadID: string, url: string): Promise<ShiPuBotResponse>;
+  sendImage(threadID: string, url: any): Promise<ShiPuBotResponse>;
+  sendVideo(threadID: string, url: any): Promise<ShiPuBotResponse>;
+  sendFile(threadID: string, url: any): Promise<ShiPuBotResponse>;
   getUserInfo(userID: string): Promise<Partial<ShiPuUser>>;
   getThreadInfo(threadID: string): Promise<Partial<ShiPuThread>>;
   getThreadList(): Promise<ShiPuThread[]>;

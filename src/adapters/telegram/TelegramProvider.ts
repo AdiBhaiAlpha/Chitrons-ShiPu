@@ -121,23 +121,86 @@ export class TelegramProvider implements MessagingProvider {
       const text = message.text;
       const replyToMessageId = message.replyToMessageId ? Number(message.replyToMessageId) : undefined;
 
-      // Handle file attachments if provided
+      // Handle file / media / buffer attachments if provided
       if (message.attachments && message.attachments.length > 0) {
         for (const att of message.attachments) {
-          const url = typeof att === 'string' ? att : att?.url;
-          if (url) {
-            try {
-              const res = await transport.sendPhoto(chatId, url, text, replyToMessageId);
-              if (res && res.ok) {
-                return {
-                  messageId: String(res.result?.message_id || Date.now()),
-                  success: true,
-                  timestamp: Date.now()
-                };
-              }
-            } catch (attErr) {
-              console.warn('[TelegramProvider] Photo send fallback to text:', attErr);
+          const item = att;
+          if (!item) continue;
+
+          let isImage = false;
+          let isVideo = false;
+          let isAudio = false;
+
+          // 1. Buffer inspection
+          if (Buffer.isBuffer(item)) {
+            if (
+              (item[0] === 0xff && item[1] === 0xd8 && item[2] === 0xff) || // JPEG
+              (item[0] === 0x89 && item[1] === 0x50 && item[2] === 0x4e && item[3] === 0x47) || // PNG
+              (item[0] === 0x47 && item[1] === 0x49 && item[2] === 0x46) || // GIF
+              (item[8] === 0x57 && item[9] === 0x45 && item[10] === 0x42 && item[11] === 0x50) // WEBP
+            ) {
+              isImage = true;
+            } else if (
+              (item[4] === 0x66 && item[5] === 0x74 && item[6] === 0x79 && item[7] === 0x70) || // MP4
+              (item[0] === 0x1a && item[1] === 0x45 && item[2] === 0xdf && item[3] === 0xa3) // WebM
+            ) {
+              isVideo = true;
+            } else if (
+              (item[0] === 0x49 && item[1] === 0x44 && item[2] === 0x33) || // MP3 ID3
+              (item[0] === 0xff && (item[1] & 0xe0) === 0xe0) || // MP3 sync
+              (item[0] === 0x4f && item[1] === 0x67 && item[2] === 0x67 && item[3] === 0x53) // OGG
+            ) {
+              isAudio = true;
+            } else {
+              isImage = true;
             }
+          }
+          // 2. Stream
+          else if (typeof item === 'object' && typeof item.pipe === 'function') {
+            const filePath = (item as any).path ? String((item as any).path) : '';
+            if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filePath)) isImage = true;
+            else if (/\.(mp4|mov|avi|webm|mkv)$/i.test(filePath)) isVideo = true;
+            else if (/\.(mp3|wav|ogg|m4a|aac)$/i.test(filePath)) isAudio = true;
+            else isImage = true;
+          }
+          // 3. String URL or Path
+          else if (typeof item === 'string') {
+            const str = item.trim();
+            if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(str) || str.startsWith('data:image/')) isImage = true;
+            else if (/\.(mp4|mov|avi|webm|mkv)(\?.*)?$/i.test(str) || str.startsWith('data:video/')) isVideo = true;
+            else if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(str) || str.startsWith('data:audio/')) isAudio = true;
+            else isImage = true;
+          }
+          // 4. Object with url/path/data
+          else if (typeof item === 'object') {
+            const target = item.path || item.url || item.uri || '';
+            if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(target)) isImage = true;
+            else if (/\.(mp4|mov|avi|webm|mkv)(\?.*)?$/i.test(target)) isVideo = true;
+            else if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(target)) isAudio = true;
+            else isImage = true;
+          }
+
+          try {
+            let res: any;
+            if (isImage) {
+              res = await transport.sendPhoto(chatId, item, text, replyToMessageId);
+            } else if (isVideo) {
+              res = await transport.sendVideo(chatId, item, text, replyToMessageId);
+            } else if (isAudio) {
+              res = await transport.sendAudio(chatId, item, text, replyToMessageId);
+            } else {
+              res = await transport.sendDocument(chatId, item, text, replyToMessageId);
+            }
+
+            if (res && res.ok) {
+              return {
+                messageId: String(res.result?.message_id || Date.now()),
+                success: true,
+                timestamp: Date.now()
+              };
+            }
+          } catch (attErr) {
+            console.warn('[TelegramProvider] Media send fallback to text:', attErr);
           }
         }
       }

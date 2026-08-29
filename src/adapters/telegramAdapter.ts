@@ -30,40 +30,122 @@ export class TelegramAdapter implements MessengerAdapter {
     this.knownThreads.set(String(threadID), { ...this.knownThreads.get(String(threadID)), ...thread });
   }
 
-  async sendMessage(threadID: string, text: string, attachments?: string[]): Promise<ShiPuBotResponse> {
+  async sendMessage(threadID: string, text: string, attachments?: any): Promise<ShiPuBotResponse> {
     const rawChatId = threadID.replace(/^tg_/, '');
     const chatId = rawChatId.startsWith('-') || /^\d+$/.test(rawChatId) ? rawChatId : threadID;
 
-    // Handle single or multiple image/file attachments if provided
-    if (attachments && attachments.length > 0) {
-      const primaryUrl = attachments[0];
-      const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(primaryUrl);
-      const isVideo = /\.(mp4|mov|avi|webm)(\?.*)?$/i.test(primaryUrl);
+    // Handle single or multiple image/file/buffer attachments if provided
+    if (attachments) {
+      const attList = Array.isArray(attachments) ? attachments : [attachments];
+      const validAtts = attList.filter(Boolean);
 
-      if (isImage) {
-        const photoRes = await this.transport.sendPhoto(chatId, primaryUrl, text || undefined);
-        const msgId = photoRes?.result?.message_id ? String(photoRes.result.message_id) : `tg_${Date.now()}`;
-        telegramLogger.info('MESSAGE_SENT', `Photo message delivered to Telegram chat ${chatId}`, { msgId, chatId });
-        return {
-          messageID: msgId,
-          threadID,
-          body: text,
-          timestamp: Date.now(),
-          senderName: this.botName,
-          attachments
-        };
-      } else if (isVideo) {
-        const videoRes = await this.transport.sendVideo(chatId, primaryUrl, text || undefined);
-        const msgId = videoRes?.result?.message_id ? String(videoRes.result.message_id) : `tg_${Date.now()}`;
-        telegramLogger.info('MESSAGE_SENT', `Video message delivered to Telegram chat ${chatId}`, { msgId, chatId });
-        return {
-          messageID: msgId,
-          threadID,
-          body: text,
-          timestamp: Date.now(),
-          senderName: this.botName,
-          attachments
-        };
+      if (validAtts.length > 0) {
+        const primaryAtt = validAtts[0];
+        let isImage = false;
+        let isVideo = false;
+        let isAudio = false;
+
+        // 1. Buffer detection by inspection or magic bytes
+        if (Buffer.isBuffer(primaryAtt)) {
+          if (
+            (primaryAtt[0] === 0xff && primaryAtt[1] === 0xd8 && primaryAtt[2] === 0xff) || // JPEG
+            (primaryAtt[0] === 0x89 && primaryAtt[1] === 0x50 && primaryAtt[2] === 0x4e && primaryAtt[3] === 0x47) || // PNG
+            (primaryAtt[0] === 0x47 && primaryAtt[1] === 0x49 && primaryAtt[2] === 0x46) || // GIF
+            (primaryAtt[8] === 0x57 && primaryAtt[9] === 0x45 && primaryAtt[10] === 0x42 && primaryAtt[11] === 0x50) // WEBP
+          ) {
+            isImage = true;
+          } else if (
+            (primaryAtt[4] === 0x66 && primaryAtt[5] === 0x74 && primaryAtt[6] === 0x79 && primaryAtt[7] === 0x70) || // MP4 / ISO Base Media
+            (primaryAtt[0] === 0x1a && primaryAtt[1] === 0x45 && primaryAtt[2] === 0xdf && primaryAtt[3] === 0xa3) // Matroska / WebM
+          ) {
+            isVideo = true;
+          } else if (
+            (primaryAtt[0] === 0x49 && primaryAtt[1] === 0x44 && primaryAtt[2] === 0x33) || // MP3 ID3
+            (primaryAtt[0] === 0xff && (primaryAtt[1] & 0xe0) === 0xe0) || // MP3 sync
+            (primaryAtt[0] === 0x4f && primaryAtt[1] === 0x67 && primaryAtt[2] === 0x67 && primaryAtt[3] === 0x53) // OGG
+          ) {
+            isAudio = true;
+          } else {
+            // Default binary buffer to image unless proven otherwise
+            isImage = true;
+          }
+        }
+        // 2. Stream detection with path
+        else if (typeof primaryAtt === 'object' && typeof primaryAtt.pipe === 'function') {
+          const filePath = (primaryAtt as any).path ? String((primaryAtt as any).path) : '';
+          if (/\.(jpg|jpeg|png|gif|webp)$/i.test(filePath)) isImage = true;
+          else if (/\.(mp4|mov|avi|webm|mkv)$/i.test(filePath)) isVideo = true;
+          else if (/\.(mp3|wav|ogg|m4a|aac)$/i.test(filePath)) isAudio = true;
+          else isImage = true;
+        }
+        // 3. String (URL or Local path)
+        else if (typeof primaryAtt === 'string') {
+          const str = primaryAtt.trim();
+          if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(str) || str.startsWith('data:image/')) isImage = true;
+          else if (/\.(mp4|mov|avi|webm|mkv)(\?.*)?$/i.test(str) || str.startsWith('data:video/')) isVideo = true;
+          else if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(str) || str.startsWith('data:audio/')) isAudio = true;
+        }
+        // 4. Object with url/path/data
+        else if (typeof primaryAtt === 'object') {
+          const target = primaryAtt.path || primaryAtt.url || primaryAtt.uri || '';
+          if (/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(target)) isImage = true;
+          else if (/\.(mp4|mov|avi|webm|mkv)(\?.*)?$/i.test(target)) isVideo = true;
+          else if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(target)) isAudio = true;
+        }
+
+        try {
+          if (isImage) {
+            const photoRes = await this.transport.sendPhoto(chatId, primaryAtt, text || undefined);
+            const msgId = photoRes?.result?.message_id ? String(photoRes.result.message_id) : `tg_${Date.now()}`;
+            telegramLogger.info('MESSAGE_SENT', `Photo media delivered to Telegram chat ${chatId}`, { msgId, chatId });
+            return {
+              messageID: msgId,
+              threadID,
+              body: text,
+              timestamp: Date.now(),
+              senderName: this.botName,
+              attachments: validAtts
+            };
+          } else if (isVideo) {
+            const videoRes = await this.transport.sendVideo(chatId, primaryAtt, text || undefined);
+            const msgId = videoRes?.result?.message_id ? String(videoRes.result.message_id) : `tg_${Date.now()}`;
+            telegramLogger.info('MESSAGE_SENT', `Video media delivered to Telegram chat ${chatId}`, { msgId, chatId });
+            return {
+              messageID: msgId,
+              threadID,
+              body: text,
+              timestamp: Date.now(),
+              senderName: this.botName,
+              attachments: validAtts
+            };
+          } else if (isAudio) {
+            const audioRes = await this.transport.sendAudio(chatId, primaryAtt, text || undefined);
+            const msgId = audioRes?.result?.message_id ? String(audioRes.result.message_id) : `tg_${Date.now()}`;
+            telegramLogger.info('MESSAGE_SENT', `Audio media delivered to Telegram chat ${chatId}`, { msgId, chatId });
+            return {
+              messageID: msgId,
+              threadID,
+              body: text,
+              timestamp: Date.now(),
+              senderName: this.botName,
+              attachments: validAtts
+            };
+          } else {
+            const docRes = await this.transport.sendDocument(chatId, primaryAtt, text || undefined);
+            const msgId = docRes?.result?.message_id ? String(docRes.result.message_id) : `tg_${Date.now()}`;
+            telegramLogger.info('MESSAGE_SENT', `Document media delivered to Telegram chat ${chatId}`, { msgId, chatId });
+            return {
+              messageID: msgId,
+              threadID,
+              body: text,
+              timestamp: Date.now(),
+              senderName: this.botName,
+              attachments: validAtts
+            };
+          }
+        } catch (mediaErr: any) {
+          telegramLogger.warn('API_ERROR', `Telegram media delivery error, falling back to message: ${mediaErr?.message || mediaErr}`);
+        }
       }
     }
 
@@ -134,15 +216,15 @@ export class TelegramAdapter implements MessengerAdapter {
     }
   }
 
-  async sendImage(threadID: string, url: string): Promise<ShiPuBotResponse> {
+  async sendImage(threadID: string, url: any): Promise<ShiPuBotResponse> {
     return this.sendMessage(threadID, '', [url]);
   }
 
-  async sendVideo(threadID: string, url: string): Promise<ShiPuBotResponse> {
+  async sendVideo(threadID: string, url: any): Promise<ShiPuBotResponse> {
     return this.sendMessage(threadID, '', [url]);
   }
 
-  async sendFile(threadID: string, url: string): Promise<ShiPuBotResponse> {
+  async sendFile(threadID: string, url: any): Promise<ShiPuBotResponse> {
     const rawChatId = threadID.replace(/^tg_/, '');
     const chatId = rawChatId.startsWith('-') || /^\d+$/.test(rawChatId) ? rawChatId : threadID;
     const res = await this.transport.sendDocument(chatId, url);
