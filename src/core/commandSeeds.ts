@@ -901,5 +901,182 @@ await message.reply(
   "━━━━━━━━━━━━━━━━━━━━━━━━━\\n" +
   "✨ SMS request dispatched successfully!"
 );`
+  },
+  {
+    name: 'tiktok',
+    filename: 'tiktok.js',
+    description: 'Auto download TikTok videos (no watermark), photo carousels & audio when link is detected in chat or commanded',
+    category: 'downloader',
+    role: 0,
+    aliases: ['tiktokdl', 'tt', 'ttdl', 'tik'],
+    guide: '{pref}tiktok <url> [audio]',
+    countDown: 3,
+    enabled: true,
+    author: 'ShiPu Ai',
+    version: '2.0.0',
+    updatedAt: new Date().toISOString(),
+    code: `const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
+
+const input = args.join(' ');
+const tiktokRegex = /(https?:\\/\\/(?:www\\.|vt\\.|vm\\.|v\\.|t\\.)?(?:tiktok\\.com|douyin\\.com)\\/[^\\s]+)/gi;
+const match = input.match(tiktokRegex) || (input.includes('tiktok.com') ? [input.trim().split(' ')[0]] : null);
+
+if (!match || match.length === 0) {
+  return await message.reply(
+    '🎬 **TIKTOK DOWNLOADER**\\n' +
+    '─────────────────────────\\n' +
+    'Please provide a valid TikTok video or photo URL.\\n\\n' +
+    '💡 **Usage Examples:**\\n' +
+    '• \`#tiktok https://vt.tiktok.com/ZS9Xexample/\`\\n' +
+    '• \`#tiktok https://www.tiktok.com/@user/video/1234567890 audio\`\\n' +
+    '• Or simply paste any TikTok link directly into the chat!'
+  );
+}
+
+const targetUrl = match[0];
+const requestedAudioOnly = args.some(a => ['audio', 'mp3', 'sound', 'music'].includes(a.toLowerCase()));
+
+try {
+  if (message && typeof message.react === 'function') {
+    try { await message.react('📥'); } catch(e) {}
+  }
+
+  const { data } = await axios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl, hd: '1' }).toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+    timeout: 20000
+  });
+
+  if (!data || data.code !== 0 || !data.data) {
+    throw new Error('Could not fetch video. Ensure link is public.');
+  }
+
+  const d = data.data;
+  const isImages = Array.isArray(d.images) && d.images.length > 0;
+  const videoUrl = d.hdplay || d.play || d.wmplay;
+  const downloadUrl = isImages ? d.images[0] : (requestedAudioOnly ? d.music : videoUrl);
+
+  let respMsg = "🎬 **TIKTOK " + (isImages ? "PHOTO SLIDESHOW" : (requestedAudioOnly ? "AUDIO" : "NO WATERMARK VIDEO")) + "**\\n" +
+    "─────────────────────────\\n" +
+    "👤 **Creator:** " + (d.author?.nickname || 'Creator') + " (@" + (d.author?.unique_id || 'tiktok') + ")\\n" +
+    "❤️ **Likes:** " + (d.digg_count || 0).toLocaleString() + " | 💬 **Comments:** " + (d.comment_count || 0).toLocaleString() + "\\n" +
+    (d.title ? "\\n📝 **Caption:**\\n" + d.title.substring(0, 250) + "\\n" : "") +
+    "─────────────────────────\\n" +
+    "🤖 *Downloaded automatically by ShiPu Ai*";
+
+  const ext = requestedAudioOnly ? 'mp3' : (isImages ? 'jpg' : 'mp4');
+  const tempPath = path.join(process.cwd(), 'tmp_tt_' + Date.now() + '.' + ext);
+
+  const res = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 35000 });
+  await fs.writeFile(tempPath, Buffer.from(res.data));
+
+  await message.reply({
+    body: respMsg,
+    attachment: fs.createReadStream(tempPath)
+  });
+
+  if (message && typeof message.react === 'function') {
+    try { await message.react('✅'); } catch(e) {}
+  }
+  setTimeout(() => fs.remove(tempPath).catch(() => {}), 20000);
+} catch (err) {
+  if (message && typeof message.reply === 'function') {
+    await message.reply("❌ **TikTok Downloader Error:** " + (err.message || 'Failed to download'));
+  }
+}`
+  },
+  {
+    name: 'insta',
+    filename: 'insta.js',
+    description: 'Auto download Instagram reels, posts, IGTV and carousels when link is detected in chat or commanded',
+    category: 'downloader',
+    role: 0,
+    aliases: ['instagram', 'ig', 'igdl', 'instadl', 'reel', 'reels'],
+    guide: '{pref}insta <url>',
+    countDown: 3,
+    enabled: true,
+    author: 'ShiPu Ai',
+    version: '1.0.0',
+    updatedAt: new Date().toISOString(),
+    code: `const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
+
+const input = args.join(' ');
+const instaRegex = /(https?:\\/\\/(?:www\\.)?(?:instagram\\.com|instagr\\.am)\\/(?:p|reel|reels|tv|share\\/(?:reel|p))\\/[\\w-]+(?:\/|\\?[^\\s]*)?)/gi;
+const match = input.match(instaRegex) || (input.includes('instagram.com') ? [input.trim()] : null);
+
+if (!match || match.length === 0) {
+  return await message.reply(
+    '📌 **INSTAGRAM DOWNLOADER**\\n' +
+    '─────────────────────────\\n' +
+    'Please provide a valid Instagram Reel or Post URL.\\n\\n' +
+    '💡 **Usage:**\\n' +
+    '• \`#insta https://www.instagram.com/reel/DZ2zV8UhBQZ/\`\\n' +
+    '• Or simply paste any Instagram link directly in the chat!'
+  );
+}
+
+const targetUrl = match[0].split('?')[0];
+
+try {
+  if (message && typeof message.react === 'function') {
+    try { await message.react('📥'); } catch(e) {}
+  }
+
+  let downloadUrl = null;
+  let username = 'instagram_user';
+  let caption = '';
+  let isVideo = true;
+
+  try {
+    const { data } = await axios.post('https://clipssaver.com/api/instagram/instagramDownloader/download-post', { url: targetUrl }, { timeout: 15000 });
+    if (data && data.data?.post) {
+      const p = data.data.post;
+      downloadUrl = p.video_url || p.display_url;
+      username = p.owner?.username || 'instagram_user';
+      caption = p.caption || '';
+      isVideo = Boolean(p.video_url || p.is_video);
+    }
+  } catch (e) {}
+
+  if (!downloadUrl) {
+    const { data } = await axios.get('https://api.v2.vidsaver.net/api/ig?url=' + encodeURIComponent(targetUrl), { timeout: 12000 });
+    downloadUrl = data?.url || data?.video || data?.data?.[0]?.url;
+    username = data?.username || 'instagram_user';
+  }
+
+  if (!downloadUrl) {
+    throw new Error('Unable to extract media from this Instagram link.');
+  }
+
+  const ext = isVideo ? 'mp4' : 'jpg';
+  const tempPath = path.join(process.cwd(), 'tmp_ig_' + Date.now() + '.' + ext);
+
+  const res = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 35000 });
+  await fs.writeFile(tempPath, Buffer.from(res.data));
+
+  let respMsg = "📸 **INSTAGRAM " + (isVideo ? "REEL / VIDEO" : "POST") + "**\\n" +
+    "─────────────────────────\\n" +
+    "👤 **User:** @" + username + "\\n" +
+    (caption ? "\\n📝 **Caption:**\\n" + caption.substring(0, 250) + "\\n" : "") +
+    "─────────────────────────\\n" +
+    "🤖 *Downloaded automatically by ShiPu Ai*";
+
+  await message.reply({
+    body: respMsg,
+    attachment: fs.createReadStream(tempPath)
+  });
+
+  if (message && typeof message.react === 'function') {
+    try { await message.react('✅'); } catch(e) {}
+  }
+  setTimeout(() => fs.remove(tempPath).catch(() => {}), 20000);
+} catch (err) {
+  if (message && typeof message.reply === 'function') {
+    await message.reply("❌ **Instagram Downloader Error:** " + (err.message || 'Failed to download'));
+  }
+}`
   }
 ];

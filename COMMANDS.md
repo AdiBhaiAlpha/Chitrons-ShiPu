@@ -134,4 +134,23 @@ Default Global Prefix: `#`
 
 ---
 
+## 📂 6. Media Downloaders & Auto-Fetch (`category: downloader`)
+
+### `#tiktok <url> [audio]`
+- **Aliases**: `tiktokdl`, `tt`, `ttdl`, `tik`
+- **Permission**: Role 0
+- **Cooldown**: 3 seconds
+- **Description**: Downloads TikTok videos in HD without watermarks, photo slideshows, or extraction of MP3 sound.
+- **Auto-Fetch Feature**: Paste any TikTok video, photo carousel, or audio link (`tiktok.com`, `vt.tiktok.com`, `vm.tiktok.com`) anywhere in the chat, and ShiPu Ai🤖 will automatically fetch, process, and upload the media without needing a command prefix!
+
+### `#insta <url>`
+- **Aliases**: `instagram`, `ig`, `igdl`, `instadl`, `reel`, `reels`
+- **Permission**: Role 0
+- **Cooldown**: 3 seconds
+- **Description**: Downloads Instagram Reels, Video posts, photo posts, and IGTV media.
+- **Auto-Fetch Feature**: Paste any Instagram post or reel URL (`instagram.com/reel/`, `instagram.com/p/`, `instagr.am/`) anywhere in the group chat, and ShiPu Ai🤖 will automatically scrape and reply with the video/image.
+
+---
+
 © 2026 ShiPu Ai🤖 Command Documentation.
+
