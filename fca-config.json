@@ -1,9 +1,9 @@
 {
-  "autoUpdate": true,
+  "autoUpdate": false,
   "checkUpdate": {
-    "enabled": true,
-    "install": true,
-    "notifyIfCurrent": true,
+    "enabled": false,
+    "install": false,
+    "notifyIfCurrent": false,
     "packageName": "@dongdev/fca-unofficial",
     "registryUrl": "https://registry.npmjs.org",
     "timeoutMs": 10000
@@ -13,7 +13,7 @@
     "reconnectInterval": 3600
   },
   "autoLogin": false,
-  "apiServer": "https://minhdong.site",
+  "apiServer": "",
   "apiKey": "",
   "credentials": {
     "email": "",

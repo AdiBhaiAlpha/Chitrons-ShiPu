@@ -2,6 +2,7 @@ import { AccountConnection, SafeAccountMeta } from './AccountConnection';
 import { messengerAccountsData, MessengerAccountRecord, ftpConfigData } from '../../db/database';
 import { CookieLoader } from './CookieLoader';
 import { FCAFallbackManager } from './fca/FCAFallbackManager';
+import { coerceAppState } from './fca/normalizeAppState';
 import { messengerLogger, MessengerLogger } from './MessengerLogger';
 import { encryptAuthState, encryptPassword, decryptAuthState } from '../../utils/crypto';
 import { IMessengerAdapter, MessengerAdapterImpl } from './MessengerAdapter';
@@ -490,7 +491,15 @@ export class MultiAccountManager {
 
     // 4. Authenticate against Facebook FCA before saving
     messengerLogger.info('AUTH', `Testing Facebook authentication for UID ${MessengerLogger.maskUid(uid)}...`);
-    const parsedCookies = JSON.parse(cookieJson);
+    let parsedCookies: any[];
+    try {
+      parsedCookies = coerceAppState(cookieJson);
+    } catch (parseErr: any) {
+      return {
+        success: false,
+        error: 'Cookie JSON could not be parsed. Export the appstate again from a logged-in facebook.com tab.'
+      };
+    }
     const authResult = await this.fallbackManager.authenticate(parsedCookies);
 
     if (!authResult.connection) {
@@ -551,6 +560,12 @@ export class MultiAccountManager {
     }
 
     this.accounts.set(accountId, connection);
+
+    // Hand the session that step 4 already authenticated over to the
+    // AccountConnection. Without this, connect() decrypts the freshly stored
+    // state and performs a SECOND Facebook login for the same account, which
+    // doubles login rate-limit exposure and orphans the first session's socket.
+    connection.setFcaConnection(authResult.connection, authResult.activeProviderName);
     await connection.connect();
 
     // 6. Register/update known state in CloudAccountManager so polling knows it is active

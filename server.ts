@@ -1,3 +1,8 @@
+// MUST be the very first import: every module below reads process.env at
+// import time, so .env has to be loaded before any of them are evaluated.
+import { initEnv } from './src/config/env';
+initEnv();
+
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import path from 'path';
@@ -429,8 +434,13 @@ function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
-  // Allow localhost dev requests in development mode
-  if (process.env.NODE_ENV !== 'production' && req.hostname === 'localhost') {
+  // Allow loopback requests in development mode.
+  // Node normalizes IPv4 loopback to `127.0.0.1` and Express reports IPv6
+  // loopback as `::1`, so matching only the literal string 'localhost' left
+  // every request made to 127.0.0.1 (the default for `curl http://127.0.0.1`)
+  // unauthorized — which is what made the cookie endpoints look broken.
+  const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1', '[::1]']);
+  if (process.env.NODE_ENV !== 'production' && LOOPBACK_HOSTS.has(req.hostname)) {
     return next();
   }
 

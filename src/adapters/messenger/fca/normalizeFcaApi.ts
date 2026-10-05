@@ -172,6 +172,18 @@ export function normalizeFcaApi(api: any, providerName: string = 'FCA'): any {
     api.unsendMessage = api.messages.unsend.bind(api.messages);
   }
 
-  messengerLogger.info('AUTH', `[${providerName}] API normalization complete. getThreadList: ${typeof api.getThreadList}, getThreadHistory: ${typeof api.getThreadHistory}, sendMessage: ${typeof api.sendMessage}`);
+  // 9. Realtime listener alias.
+  // DongDev exposes both `listen` and `listenMqtt`; some forks expose only
+  // `listenMqtt`. AccountConnection used to feature-detect on `listenMqtt` but
+  // then call `api.listen(...)`, which is undefined on the latter — so the
+  // listener silently failed to register. Guarantee both names exist.
+  if (typeof api.listenMqtt !== 'function' && typeof api.listen === 'function') {
+    api.listenMqtt = api.listen.bind(api);
+  }
+  if (typeof api.listen !== 'function' && typeof api.listenMqtt === 'function') {
+    api.listen = api.listenMqtt.bind(api);
+  }
+
+  messengerLogger.info('AUTH', `[${providerName}] API normalization complete. getThreadList: ${typeof api.getThreadList}, getThreadHistory: ${typeof api.getThreadHistory}, sendMessage: ${typeof api.sendMessage}, listenMqtt: ${typeof api.listenMqtt}, listen: ${typeof api.listen}, stopListeningAsync: ${typeof api.stopListeningAsync}`);
   return api;
 }

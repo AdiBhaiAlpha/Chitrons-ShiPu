@@ -4,6 +4,7 @@ import { messengerLogger, MessengerLogger } from './MessengerLogger';
 import { ErrorClassifier } from './ErrorClassifier';
 import { personalAIAccountsData, PersonalAIAccountRecord } from '../../db/database';
 import { decryptAuthState, encryptAuthState } from '../../utils/crypto';
+import { coerceAppState } from './fca/normalizeAppState';
 import { isSelfEvent } from '../../utils/commandParser';
 import { contextEngine } from '../../services/contextEngine';
 import { GoogleGenAI } from '@google/genai';
@@ -279,7 +280,7 @@ export class PersonalAccountConnection {
       return false;
     }
 
-    const authResult = await this.fallbackManager.authenticate(JSON.parse(authState));
+    const authResult = await this.fallbackManager.authenticate(coerceAppState(authState));
     if (!authResult.connection) {
       this.status = 'AUTH_EXPIRED';
       this.mqttStatus = 'OFF';
@@ -337,7 +338,7 @@ export class PersonalAccountConnection {
         });
       }
 
-      this.stopListenerFunc = api.listenMqtt((err: any, event: any) => {
+      const listenReturn = api.listenMqtt((err: any, event: any) => {
         const isAuthEvent = event && (event.type === 'account_inactive' || event.type === 'auth_error' || event.type === 'login_blocked' || event.type === 'stop_listen' || event.error);
         const activeErr = err || (isAuthEvent ? (event.error || event.reason || event) : null);
 
@@ -403,6 +404,38 @@ export class PersonalAccountConnection {
           }
         }
       });
+
+      // listenMqtt returns an emitter object (stopListening / stopListeningAsync),
+      // NOT a stop function. Storing it raw meant every teardown call threw
+      // "not a function" into an empty catch and the old subscription stayed
+      // open, stacking a duplicate MQTT consumer on each reconnect.
+      let stoppedLocally = false;
+      this.stopListenerFunc = () => {
+        if (stoppedLocally) return;
+        stoppedLocally = true;
+        const ret: any = listenReturn;
+        if (typeof ret === 'function') {
+          try { ret(); } catch {}
+          return;
+        }
+        if (typeof api.stopListeningAsync === 'function') {
+          try {
+            const p = api.stopListeningAsync();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          } catch {}
+          return;
+        }
+        if (typeof api.stopListening === 'function') {
+          try { api.stopListening(() => {}); } catch {}
+          return;
+        }
+        if (ret && typeof ret.stopListeningAsync === 'function') {
+          try {
+            const p = ret.stopListeningAsync();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          } catch {}
+        }
+      };
 
       this.status = 'MQTT_LISTENING';
       this.mqttStatus = 'LISTENING';
@@ -650,11 +683,11 @@ Respond naturally, concisely, and intelligently to the user's message without an
       } catch {}
       this.stopListenerFunc = null;
     }
-    if (this.fcaConnection?.api?.logout) {
-      try {
-        this.fcaConnection.api.logout();
-      } catch {}
-    }
+
+    // Deliberately no api.logout() here: logout revokes the session on
+    // Facebook's servers and invalidates the stored cookies, so a plain
+    // disconnect must only tear down the transport. Use adminLogout() to
+    // actually end the session.
 
     this.fcaConnection = null;
     this.status = 'DISCONNECTED';

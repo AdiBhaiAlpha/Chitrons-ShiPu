@@ -1,4 +1,7 @@
 import { FCAFallbackManager } from './fca/FCAFallbackManager';
+import { buildFcaLoginOptions } from './fca/fcaLoginOptions';
+import { isMqttListenerEnabled } from './fca/fcaConfig';
+import { coerceAppState } from './fca/normalizeAppState';
 import { FCAConnection } from './fca/FCAProvider';
 import { normalizeFcaApi } from './fca/normalizeFcaApi';
 import { messengerLogger, MessengerLogger } from './MessengerLogger';
@@ -147,6 +150,10 @@ export class AccountConnection {
 
   private fcaConnection: FCAConnection | null = null;
   private stopListenerFunc: (() => void) | null = null;
+  /** Fires if a registered listener delivers no event within the grace period. */
+  private deadStreamWatchdog: NodeJS.Timeout | null = null;
+  /** Incremented on every start/teardown to invalidate stale listener handles. */
+  private listenerGeneration = 0;
   public activeProviderName = 'DongDev FCA';
   private fallbackManager = new FCAFallbackManager();
 
@@ -489,7 +496,9 @@ export class AccountConnection {
     }
 
     if (this.authType === 'cookie') {
-      const authResult = await this.fallbackManager.authenticate(JSON.parse(authState));
+      // coerceAppState (not JSON.parse) so an object-format export cannot
+      // reach the provider and blow up on .map()
+      const authResult = await this.fallbackManager.authenticate(coerceAppState(authState));
 
       if (!authResult.connection) {
         const classified = ErrorClassifier.classify({
@@ -558,8 +567,25 @@ export class AccountConnection {
   }
 
   private startMqttListener(): boolean {
+    // fca-config.json's mqtt.enabled is ignored by FCA itself; honour it here.
+    if (!isMqttListenerEnabled()) {
+      messengerLogger.info(
+        'MQTT',
+        `[MQTT][Account ${this.accountId}] Realtime listener disabled via fca-config.json (mqtt.enabled = false)`
+      );
+      this.teardownListener('mqtt-disabled');
+      this.status = 'CONNECTED';
+      this.mqttStatus = 'OFF';
+      this.sessionState.status = 'AUTHENTICATED';
+      this.emitStatusChange();
+      return false;
+    }
+
     const api = this.getFcaApi();
-    if (!api || !api.listenMqtt) {
+    const canListen =
+      !!api && (typeof api.listenMqtt === 'function' || typeof api.listen === 'function');
+
+    if (!canListen) {
       if (this.authType === 'oauth') {
         // Meta OAuth Webhook transport mode
         this.status = 'CONNECTED';
@@ -577,185 +603,96 @@ export class AccountConnection {
       return false;
     }
 
-    if (this.stopListenerFunc) {
-      try {
-        this.stopListenerFunc();
-      } catch {}
-      this.stopListenerFunc = null;
-    }
+    // Tear down any previous subscription BEFORE creating a new one. The old
+    // code only nulled this field when the return value happened to be a
+    // function; api.listenMqtt returns an emitter object, so the previous
+    // stream stayed open and every reconnect stacked another subscription.
+    this.teardownListener('reconnect');
 
     try {
       messengerLogger.info('MQTT', `[INFO][MQTT][Account ${this.accountId}] Attempting listener reconnect using existing authenticated session`);
-      
+
       if (typeof api.setOptions === 'function') {
-        api.setOptions({
-          listenEvents: true,
-          selfListen: true,
-          autoReconnect: false,
-          logLevel: 'silent',
-          updatePresence: false
-        });
+        api.setOptions(buildFcaLoginOptions());
       }
 
-      this.stopListenerFunc = api.listen((err: any, event: any) => {
-        messengerLogger.info('MQTT', `[DEBUG][LISTEN][Account ${this.accountId}] Received callback in listen. Error: ${!!err}, Event: ${!!event}`);
-        
-        // Handle explicit error parameter OR inactive/auth error objects passed inside event parameter
-        const isAuthEvent = event && (event.type === 'account_inactive' || event.type === 'auth_error' || event.type === 'login_blocked' || event.type === 'stop_listen' || event.error);
-        const activeErr = err || (isAuthEvent ? (event.error || event.reason || event) : null);
+      // Register via the FCAConnection wrapper instead of api.listen directly:
+      // the wrapper normalizes listenMqtt/listen across provider forks and
+      // returns a real, idempotent teardown function.
+      const listenResult = this.fcaConnection?.listen(
+        (event: any) => this.handleRealtimeEvent(api, event),
+        (err: any) => this.handleRealtimeFailure(err)
+      ) as unknown as Promise<() => void>;
 
-        if (activeErr) {
-          const classified = ErrorClassifier.classify(activeErr);
-          this.lastErrorCode = classified.code;
+      if (!listenResult || typeof (listenResult as any).then !== 'function') {
+        messengerLogger.error(
+          'MQTT',
+          `[ERROR][MQTT][Account ${this.accountId}] FCA listen() did not return a stop function`
+        );
+        this.status = 'TEMPORARY_ERROR';
+        this.mqttStatus = 'ERROR';
+        this.lastErrorCode = 'LISTEN_SETUP_FAILED';
+        this.emitStatusChange();
+        this.scheduleMqttReconnect();
+        return false;
+      }
 
-          messengerLogger.warn('MQTT', `[WARN][MQTT][Account ${this.accountId}] MQTT connection lost: ${classified.reason}`);
+      // listen() is async, so the teardown function only exists after it
+      // resolves. Bump a generation counter first: if disconnect() or a newer
+      // startMqttListener() ran while we were waiting, the resolved handle
+      // belongs to a dead subscription and must be stopped immediately
+      // instead of being installed as the live teardown.
+      const generation = ++this.listenerGeneration;
 
-          if (!classified.isTemporary) {
-            messengerLogger.error('AUTH', `[ERROR][AUTH][Account ${this.accountId}] Hard authentication error during MQTT session: ${classified.reason}`);
-            this.status = classified.code === 'CHECKPOINT' ? 'CHECKPOINT' : 'COOKIE_EXPIRED';
-            this.mqttStatus = 'OFF';
-            this.sessionState.status = 'AUTH_INVALID';
-            this.sessionState.authenticated = false;
-            if (this.reconnectTimer) {
-              clearTimeout(this.reconnectTimer);
-              this.reconnectTimer = null;
+      (listenResult as Promise<() => void>).then(
+        (fn) => {
+          if (generation !== this.listenerGeneration) {
+            // Superseded mid-registration (disconnect / restart race).
+            if (typeof fn === 'function') {
+              try { fn(); } catch {}
+              messengerLogger.info(
+                'MQTT',
+                `[MQTT][Account ${this.accountId}] Stopped a superseded listener handle from a cancelled start`
+              );
             }
-            if (typeof this.stopListenerFunc === 'function') {
-              try {
-                this.stopListenerFunc();
-              } catch {}
-              this.stopListenerFunc = null;
-            }
-            this.emitStatusChange();
             return;
           }
 
-          this.status = 'TEMPORARY_ERROR';
-          this.mqttStatus = 'DISCONNECTED';
-          this.sessionState.status = 'DISCONNECTED';
-          messengerLogger.info('RECONNECT', `[Account ${this.accountId}] Preserving saved session/cookie during temporary error. Scheduling reconnect...`);
-          this.emitStatusChange();
+          if (typeof fn === 'function') {
+            this.stopListenerFunc = fn;
+          } else {
+            // Provider handed back a non-callable handle (emitter object).
+            // Route teardown through the provider's own stop API instead.
+            messengerLogger.error(
+              'MQTT',
+              `[ERROR][MQTT][Account ${this.accountId}] Provider returned a non-callable listener handle; using the provider stop API for teardown`
+            );
+            this.stopListenerFunc = () => this.forceStopProviderListener(api);
+          }
 
-          // Schedule MQTT reconnect using the existing authenticated API session (NO login() call)
-          this.scheduleMqttReconnect();
-          return;
+          this.armDeadStreamWatchdog(api);
+        },
+        (err: any) => {
+          if (generation !== this.listenerGeneration) return;
+          messengerLogger.error(
+            'MQTT',
+            `[ERROR][MQTT][Account ${this.accountId}] listen() rejected: ${err?.message || err}`
+          );
+          this.handleRealtimeFailure(err);
         }
+      );
 
-        if (event) {
-          const traceId = event._traceId || `evt_trace_${event.messageID || Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          event._traceId = traceId;
-
-          const msgSnippet = String(event.body || '').substring(0, 30);
-          console.log(`[PIPELINE TRACE][STAGE 1: FCA_MQTT_RECEIVE][ID: ${traceId}] Event received from MQTT stream. Account: ${this.accountId}, Thread: ${event.threadID || event.thread_fbid || 'N/A'}, Sender: ${event.senderID || event.senderId || event.author || 'N/A'}, Snippet: "${msgSnippet}"`);
-
-          // Self-event filter check BEFORE any processing or dispatch
-          if (isSelfEvent(event, this.uid)) {
-            console.log(`[PIPELINE TRACE][STAGE 1: FCA_MQTT_RECEIVE][ID: ${traceId}] Dropping self-event for bot UID ${this.uid}`);
-            messengerLogger.info('MQTT', `[MQTT] Incoming message`);
-            messengerLogger.info('EVENT', `[EVENT] Sender UID: ${event.senderID || event.senderId || event.author || 'BOT_SELF'}`);
-            messengerLogger.info('SESSION', `[SELF-FILTER] Sender matches authenticated bot UID (${this.uid})`);
-            messengerLogger.info('SESSION', `[SELF-FILTER] Ignoring bot's own event`);
-            messengerLogger.info('COMMAND', `[COMMAND] NOT EXECUTED`);
-            return;
-          }
-
-          // MANDATORY AUTO-SEEN / READ RECEIPT (MESSAGE_RECEIVED -> MARK_SEEN -> PROCESS_MESSAGE)
-          const threadID = String(event.threadID || event.thread_fbid || '');
-          const messageID = String(event.messageID || event.messageId || '');
-          
-          console.log(`[PIPELINE TRACE][MESSAGE_RECEIVED][ID: ${traceId}] Account ${this.accountId} received message event in Thread ${threadID || 'N/A'}`);
-
-          if (threadID && api) {
-            const dedupeKey = `${threadID}_${messageID || event.timestamp || 'latest'}`;
-            const now = Date.now();
-            const lastSeenTime = this.recentlySeenCache.get(threadID) || 0;
-
-            if (now - lastSeenTime > 4000 || !this.recentlySeenCache.has(dedupeKey)) {
-              this.recentlySeenCache.set(threadID, now);
-              this.recentlySeenCache.set(dedupeKey, now);
-
-              console.log(`[PIPELINE TRACE][MARK_SEEN][ID: ${traceId}] Attempting markAsRead/markAsSeen for Thread ${threadID}`);
-              try {
-                if (typeof api.markAsRead === 'function') {
-                  api.markAsRead(threadID, (err: any) => {
-                    if (err) {
-                      console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] markAsRead failed: ${err.message || err}`);
-                    } else {
-                      console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as read/seen via markAsRead`);
-                    }
-                  });
-                } else if (api.messages && typeof api.messages.markRead === 'function') {
-                  api.messages.markRead(threadID, (err: any) => {
-                    if (err) {
-                      console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] messages.markRead failed: ${err.message || err}`);
-                    } else {
-                      console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as read/seen via messages.markRead`);
-                    }
-                  });
-                } else if (typeof api.markAsSeen === 'function') {
-                  api.markAsSeen(threadID, (err: any) => {
-                    if (err) {
-                      console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] markAsSeen failed: ${err.message || err}`);
-                    } else {
-                      console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as seen via markAsSeen`);
-                    }
-                  });
-                }
-              } catch (markErr: any) {
-                console.warn(`[PIPELINE TRACE][MARK_SEEN_ERROR][ID: ${traceId}] Error executing MARK_SEEN:`, markErr?.message || markErr);
-              }
-            }
-          }
-
-          console.log(`[PIPELINE TRACE][PROCESS_MESSAGE][ID: ${traceId}] Proceeding with normal processing and dispatch`);
-
-          if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-          }
-          this.reconnectCount = 0;
-
-          if (this.mqttStatus !== 'EVENT_STREAM_ACTIVE') {
-            messengerLogger.success('MQTT', `[SUCCESS][MQTT][Account ${this.accountId}] MQTT listener restored`);
-            messengerLogger.success('SESSION', `[SUCCESS][ACCOUNT][Account ${this.accountId}] Account ONLINE`);
-          }
-
-          this.status = 'CONNECTED';
-          this.mqttStatus = 'EVENT_STREAM_ACTIVE';
-          this.sessionState.status = 'LISTENING';
-          this.sessionState.lastEventAt = Date.now();
-          this.emitStatusChange();
-
-          // Normalize event to carry account isolation metadata
-          const normalizedEvent = {
-            ...event,
-            accountId: this.accountId,
-            authenticatedUid: this.uid,
-            _traceId: traceId
-          };
-
-          if (event.type === 'event') {
-            groupSetupService.handleGroupEvent(api, event, this.uid);
-          }
-
-          console.log(`[PIPELINE TRACE][STAGE 2: ACCOUNT_CONNECTION_DISPATCH][ID: ${traceId}] Dispatching event to ${this.eventListeners.length} listener(s) for Account ${this.accountId}`);
-
-          // Direct fast dispatch to all registered listeners
-          for (const listener of this.eventListeners) {
-            try {
-              listener(normalizedEvent);
-            } catch (dispatchErr: any) {
-              console.error(`[PIPELINE TRACE][STAGE 2: ACCOUNT_CONNECTION_DISPATCH][ID: ${traceId}] Listener error:`, dispatchErr?.message || dispatchErr);
-            }
-          }
-        }
-      });
-
+      // Provisional state: the subscription is registered, but no event has
+      // proven the stream is live. The watchdog promotes this to
+      // EVENT_STREAM_ACTIVE, or fails it if the stream stays deaf.
       this.status = 'MQTT_LISTENING';
       this.mqttStatus = 'LISTENING';
       this.sessionState.status = 'LISTENING';
       this.emitStatusChange();
-      messengerLogger.success('MQTT', `[SUCCESS][MQTT][Account ${this.accountId}] listenMqtt active`);
+      messengerLogger.info(
+        'MQTT',
+        `[SUCCESS][MQTT][Account ${this.accountId}] Listener registered; awaiting first stream event (watchdog armed)`
+      );
       return true;
     } catch (mqttErr: any) {
       const classified = ErrorClassifier.classify(mqttErr);
@@ -772,12 +709,7 @@ export class AccountConnection {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
-        if (typeof this.stopListenerFunc === 'function') {
-          try {
-            this.stopListenerFunc();
-          } catch {}
-          this.stopListenerFunc = null;
-        }
+        this.teardownListener('terminal-error');
         this.emitStatusChange();
         return false;
       }
@@ -785,11 +717,264 @@ export class AccountConnection {
       this.status = 'TEMPORARY_ERROR';
       this.mqttStatus = 'ERROR';
       this.sessionState.status = 'DISCONNECTED';
+      this.teardownListener('setup-error');
       this.emitStatusChange();
 
       this.scheduleMqttReconnect();
       return false;
     }
+  }
+
+  /**
+   * Stop the current realtime subscription, if any.
+   *
+   * `reason` is only used for logging. Safe to call when nothing is running.
+   */
+  private teardownListener(reason: string): void {
+    // Invalidate any in-flight listen() registration so a late-resolving
+    // handle cannot resurrect a torn-down subscription.
+    this.listenerGeneration++;
+
+    if (this.deadStreamWatchdog) {
+      clearTimeout(this.deadStreamWatchdog);
+      this.deadStreamWatchdog = null;
+    }
+
+    const fn = this.stopListenerFunc;
+    this.stopListenerFunc = null;
+
+    if (typeof fn === 'function') {
+      try {
+        fn();
+        messengerLogger.info('MQTT', `[MQTT][Account ${this.accountId}] Listener stopped (${reason})`);
+      } catch (err: any) {
+        messengerLogger.warn(
+          'MQTT',
+          `[WARN][MQTT][Account ${this.accountId}] Listener stop threw during ${reason}: ${err?.message || err}`
+        );
+      }
+      return;
+    }
+
+    // The stop function was never assigned (disconnect raced startup) or the
+    // provider gave us a non-callable handle: use the provider's stop API.
+    const api = this.getFcaApi();
+    if (api) {
+      this.forceStopProviderListener(api);
+      messengerLogger.info(
+        'MQTT',
+        `[MQTT][Account ${this.accountId}] Listener stopped via provider API (${reason})`
+      );
+    }
+  }
+
+  /**
+   * `api.listenMqtt` returns an emitter object, not a function, so the real
+   * teardown lives on the api (stopListeningAsync / stopListening).
+   */
+  private forceStopProviderListener(api: any): void {
+    try {
+      if (typeof api.stopListeningAsync === 'function') {
+        const p = api.stopListeningAsync();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+        return;
+      }
+      if (typeof api.stopListening === 'function') {
+        api.stopListening(() => {});
+      }
+    } catch {}
+  }
+
+  /**
+   * A registered subscription that never delivers an event is the failure mode
+   * this whole class of bug produces: `getSeqID` fails, FCA emits neither an
+   * error nor an event, and the account sits in LISTENING forever looking
+   * healthy while deaf. Promote to EVENT_STREAM_ACTIVE on the first event, or
+   * fail the listener when the stream stays silent past the grace period.
+   */
+  private armDeadStreamWatchdog(api: any): void {
+    if (this.deadStreamWatchdog) clearTimeout(this.deadStreamWatchdog);
+
+    const graceMs = Number(process.env.MQTT_FIRST_EVENT_TIMEOUT_MS) || 60_000;
+    this.deadStreamWatchdog = setTimeout(() => {
+      this.deadStreamWatchdog = null;
+
+      // A late event already promoted us; nothing to do.
+      if (this.mqttStatus === 'EVENT_STREAM_ACTIVE') return;
+
+      messengerLogger.error(
+        'MQTT',
+        `[ERROR][MQTT][Account ${this.accountId}] Listener registered but received NO event in ${graceMs}ms — stream is connected but deaf (getSeqID handshake rejected)`
+      );
+      this.teardownListener('dead-stream-watchdog');
+
+      this.handleRealtimeFailure(
+        new Error('MQTT_STREAM_DEAF: no realtime event within grace period')
+      );
+      void api;
+    }, graceMs);
+
+    if (typeof this.deadStreamWatchdog.unref === 'function') {
+      this.deadStreamWatchdog.unref();
+    }
+  }
+
+  /**
+   * Handle a live realtime event from the Facebook MQTT stream.
+   */
+  private handleRealtimeEvent(api: any, event: any): void {
+    if (!event) return;
+
+    // First event proves the stream is actually live. Promote the provisional
+    // LISTENING state set at registration time and disarm the dead-stream
+    // watchdog.
+    if (this.deadStreamWatchdog) {
+      clearTimeout(this.deadStreamWatchdog);
+      this.deadStreamWatchdog = null;
+    }
+      const traceId = event._traceId || `evt_trace_${event.messageID || Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      event._traceId = traceId;
+
+      const msgSnippet = String(event.body || '').substring(0, 30);
+      console.log(`[PIPELINE TRACE][STAGE 1: FCA_MQTT_RECEIVE][ID: ${traceId}] Event received from MQTT stream. Account: ${this.accountId}, Thread: ${event.threadID || event.thread_fbid || 'N/A'}, Sender: ${event.senderID || event.senderId || event.author || 'N/A'}, Snippet: "${msgSnippet}"`);
+
+      // Self-event filter check BEFORE any processing or dispatch
+      if (isSelfEvent(event, this.uid)) {
+        console.log(`[PIPELINE TRACE][STAGE 1: FCA_MQTT_RECEIVE][ID: ${traceId}] Dropping self-event for bot UID ${this.uid}`);
+        messengerLogger.info('MQTT', `[MQTT] Incoming message`);
+        messengerLogger.info('EVENT', `[EVENT] Sender UID: ${event.senderID || event.senderId || event.author || 'BOT_SELF'}`);
+        messengerLogger.info('SESSION', `[SELF-FILTER] Sender matches authenticated bot UID (${this.uid})`);
+        messengerLogger.info('SESSION', `[SELF-FILTER] Ignoring bot's own event`);
+        messengerLogger.info('COMMAND', `[COMMAND] NOT EXECUTED`);
+        return;
+      }
+
+      // MANDATORY AUTO-SEEN / READ RECEIPT (MESSAGE_RECEIVED -> MARK_SEEN -> PROCESS_MESSAGE)
+      const threadID = String(event.threadID || event.thread_fbid || '');
+      const messageID = String(event.messageID || event.messageId || '');
+      
+      console.log(`[PIPELINE TRACE][MESSAGE_RECEIVED][ID: ${traceId}] Account ${this.accountId} received message event in Thread ${threadID || 'N/A'}`);
+
+      if (threadID && api) {
+        const dedupeKey = `${threadID}_${messageID || event.timestamp || 'latest'}`;
+        const now = Date.now();
+        const lastSeenTime = this.recentlySeenCache.get(threadID) || 0;
+
+        if (now - lastSeenTime > 4000 || !this.recentlySeenCache.has(dedupeKey)) {
+          this.recentlySeenCache.set(threadID, now);
+          this.recentlySeenCache.set(dedupeKey, now);
+
+          console.log(`[PIPELINE TRACE][MARK_SEEN][ID: ${traceId}] Attempting markAsRead/markAsSeen for Thread ${threadID}`);
+          try {
+            if (typeof api.markAsRead === 'function') {
+              api.markAsRead(threadID, (err: any) => {
+                if (err) {
+                  console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] markAsRead failed: ${err.message || err}`);
+                } else {
+                  console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as read/seen via markAsRead`);
+                }
+              });
+            } else if (api.messages && typeof api.messages.markRead === 'function') {
+              api.messages.markRead(threadID, (err: any) => {
+                if (err) {
+                  console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] messages.markRead failed: ${err.message || err}`);
+                } else {
+                  console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as read/seen via messages.markRead`);
+                }
+              });
+            } else if (typeof api.markAsSeen === 'function') {
+              api.markAsSeen(threadID, (err: any) => {
+                if (err) {
+                  console.warn(`[PIPELINE TRACE][MARK_SEEN_WARN][ID: ${traceId}] markAsSeen failed: ${err.message || err}`);
+                } else {
+                  console.log(`[PIPELINE TRACE][MARK_SEEN_SUCCESS][ID: ${traceId}] Successfully marked thread ${threadID} as seen via markAsSeen`);
+                }
+              });
+            }
+          } catch (markErr: any) {
+            console.warn(`[PIPELINE TRACE][MARK_SEEN_ERROR][ID: ${traceId}] Error executing MARK_SEEN:`, markErr?.message || markErr);
+          }
+        }
+      }
+
+      console.log(`[PIPELINE TRACE][PROCESS_MESSAGE][ID: ${traceId}] Proceeding with normal processing and dispatch`);
+
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.reconnectCount = 0;
+
+      if (this.mqttStatus !== 'EVENT_STREAM_ACTIVE') {
+        messengerLogger.success('MQTT', `[SUCCESS][MQTT][Account ${this.accountId}] MQTT listener restored`);
+        messengerLogger.success('SESSION', `[SUCCESS][ACCOUNT][Account ${this.accountId}] Account ONLINE`);
+      }
+
+      this.status = 'CONNECTED';
+      this.mqttStatus = 'EVENT_STREAM_ACTIVE';
+      this.sessionState.status = 'LISTENING';
+      this.sessionState.lastEventAt = Date.now();
+      this.emitStatusChange();
+
+      // Normalize event to carry account isolation metadata
+      const normalizedEvent = {
+        ...event,
+        accountId: this.accountId,
+        authenticatedUid: this.uid,
+        _traceId: traceId
+      };
+
+      if (event.type === 'event') {
+        groupSetupService.handleGroupEvent(api, event, this.uid);
+      }
+
+      console.log(`[PIPELINE TRACE][STAGE 2: ACCOUNT_CONNECTION_DISPATCH][ID: ${traceId}] Dispatching event to ${this.eventListeners.length} listener(s) for Account ${this.accountId}`);
+
+      // Direct fast dispatch to all registered listeners
+      for (const listener of this.eventListeners) {
+        try {
+          listener(normalizedEvent);
+        } catch (dispatchErr: any) {
+          console.error(`[PIPELINE TRACE][STAGE 2: ACCOUNT_CONNECTION_DISPATCH][ID: ${traceId}] Listener error:`, dispatchErr?.message || dispatchErr);
+        }
+      }
+  }
+
+  /**
+   * Central handler for realtime subscription failures (auth errors,
+   * transport drops, dead streams). Decides terminal vs. retryable and drives
+   * the reconnect policy.
+   */
+  private handleRealtimeFailure(activeErr: any): void {
+    const classified = ErrorClassifier.classify(activeErr);
+    this.lastErrorCode = classified.code;
+
+    messengerLogger.warn('MQTT', `[WARN][MQTT][Account ${this.accountId}] MQTT connection lost: ${classified.reason}`);
+
+    if (!classified.isTemporary) {
+      messengerLogger.error('AUTH', `[ERROR][AUTH][Account ${this.accountId}] Hard authentication error during MQTT session: ${classified.reason}`);
+      this.status = classified.code === 'CHECKPOINT' ? 'CHECKPOINT' : 'COOKIE_EXPIRED';
+      this.mqttStatus = 'OFF';
+      this.sessionState.status = 'AUTH_INVALID';
+      this.sessionState.authenticated = false;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.teardownListener('terminal-auth-error');
+      this.emitStatusChange();
+      return;
+    }
+
+    this.status = 'TEMPORARY_ERROR';
+    this.mqttStatus = 'DISCONNECTED';
+    this.sessionState.status = 'DISCONNECTED';
+    messengerLogger.info('RECONNECT', `[Account ${this.accountId}] Preserving saved session/cookie during temporary error. Scheduling reconnect...`);
+    this.teardownListener('temporary-error');
+    this.emitStatusChange();
+
+    // Reconnect using the existing authenticated API session (NO login() call)
+    this.scheduleMqttReconnect();
   }
 
   private scheduleMqttReconnect() {
@@ -833,12 +1018,7 @@ export class AccountConnection {
       this.reconnectTimer = null;
     }
 
-    if (this.stopListenerFunc) {
-      try {
-        this.stopListenerFunc();
-      } catch {}
-      this.stopListenerFunc = null;
-    }
+    this.teardownListener('disconnect');
 
     // CRITICAL: Do NOT call api.logout() during normal disconnect / process restart!
     // Calling api.logout() revokes the session on Facebook's servers.
@@ -856,12 +1036,7 @@ export class AccountConnection {
       this.reconnectTimer = null;
     }
 
-    if (this.stopListenerFunc) {
-      try {
-        this.stopListenerFunc();
-      } catch {}
-      this.stopListenerFunc = null;
-    }
+    this.teardownListener('disconnect');
 
     if (this.fcaConnection?.api?.logout) {
       try {

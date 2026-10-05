@@ -3,6 +3,7 @@ import { personalAIAccountsData, PersonalAIAccountRecord } from '../../db/databa
 import { CookieLoader } from './CookieLoader';
 import { messengerLogger, MessengerLogger } from './MessengerLogger';
 import { encryptAuthState } from '../../utils/crypto';
+import { coerceAppState } from './fca/normalizeAppState';
 
 export class PersonalAIManager {
   private static instance: PersonalAIManager;
@@ -193,13 +194,8 @@ export class PersonalAIManager {
 
     const uid = formatValidation.userId;
     const accountId = `pai_${uid}`;
-    let parsedCookies: any = [];
-    try {
-      parsedCookies = JSON.parse(cookieJson);
-    } catch {
-      parsedCookies = [];
-    }
-    const encryptedState = encryptAuthState(parsedCookies);
+    const parsedCookies = coerceAppState(cookieJson);
+    const encryptedState = encryptAuthState(JSON.stringify(parsedCookies));
 
     const record: PersonalAIAccountRecord = {
       accountId,

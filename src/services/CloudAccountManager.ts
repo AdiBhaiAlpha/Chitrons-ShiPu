@@ -5,6 +5,7 @@ import { AccountConnection, SafeAccountMeta } from '../adapters/messenger/Accoun
 import { CookieLoader } from '../adapters/messenger/CookieLoader';
 import { FCAFallbackManager } from '../adapters/messenger/fca/FCAFallbackManager';
 import { FCAConnection } from '../adapters/messenger/fca/FCAProvider';
+import { coerceAppState } from '../adapters/messenger/fca/normalizeAppState';
 import { messengerLogger, MessengerLogger } from '../adapters/messenger/MessengerLogger';
 import { decryptAuthState, encryptAuthState } from '../utils/crypto';
 import mongoose from 'mongoose';
@@ -626,7 +627,12 @@ export class CloudAccountManager {
   public async loginAccount(record: MessengerAccountRecord): Promise<{ success: boolean; connection?: FCAConnection; providerName?: string; error?: string }> {
     try {
       const cookieJson = this.decryptCookie(record.encryptedAuthState);
-      const parsedCookies = JSON.parse(cookieJson);
+      // coerceAppState handles the object-export shape too; a bare JSON.parse
+      // would hand FCA an object and fail on the first .map().
+      const parsedCookies = coerceAppState(cookieJson);
+      if (parsedCookies.length === 0) {
+        return { success: false, error: 'Stored appstate contained no usable cookies. Re-import the cookie JSON.' };
+      }
 
       const result = await this.fallbackManager.authenticate(parsedCookies);
       if (result.connection) {

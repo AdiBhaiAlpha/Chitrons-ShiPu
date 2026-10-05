@@ -1,5 +1,6 @@
 import { supabaseService } from './SupabaseService';
 import { encryptAuthState, decryptAuthState, encryptPassword } from '../utils/crypto';
+import { coerceAppState } from '../adapters/messenger/fca/normalizeAppState';
 import { CookieLoader } from '../adapters/messenger/CookieLoader';
 import { FCAFallbackManager } from '../adapters/messenger/fca/FCAFallbackManager';
 import { MultiAccountManager } from '../adapters/messenger/MultiAccountManager';
@@ -252,9 +253,11 @@ export class ClientBotsManager {
     await client.from('client_bot_sessions').update({ status: 'logging_in', updated_at: new Date() }).eq('id', session.id);
     this.log(botId, 'INFO', 'LOGIN', 'Authenticating and selecting FCA provider...');
 
-    const parsedCookies = JSON.parse(session.cookie);
-      if (!Array.isArray(parsedCookies)) {
-        throw new Error('Cookie payload must be a JSON array');
+    // coerceAppState accepts the array form and the object-export form; the old
+    // `Array.isArray` guard rejected valid exports outright.
+    const parsedCookies = coerceAppState(session.cookie);
+      if (parsedCookies.length === 0) {
+        throw new Error('Cookie payload contained no usable cookies');
       }
       const authResult = await this.fallbackManager.authenticate(parsedCookies);
 
@@ -320,6 +323,11 @@ export class ClientBotsManager {
       } else {
         connection.updateRecord(dbRecord);
       }
+
+      // Reuse the session authenticated above. connect() would otherwise
+      // decrypt dbRecord.encryptedAuthState and perform a second Facebook
+      // login for the same account.
+      connection.setFcaConnection(authResult.connection, authResult.activeProviderName);
 
       const connected = await connection.connect();
 
