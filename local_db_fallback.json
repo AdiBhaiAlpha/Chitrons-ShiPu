@@ -1,4 +1,6 @@
 {
+  "messengeraccount": [],
+  "cloudaccounts": [],
   "economyconfig": [
     {
       "key": "primary",
@@ -111,7 +113,7 @@
       "aiEnabled": true,
       "economyEnabled": true,
       "isBanned": false,
-      "createdAt": 1786396993509
+      "createdAt": 1791664275616
     },
     {
       "threadID": "thread_102",
@@ -181,7 +183,7 @@
       "enabled": true,
       "author": "ShiPu Dev Team",
       "version": "3.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: help.js\nconst prefix = (globalThis.currentThread && globalThis.currentThread.prefix) ? globalThis.currentThread.prefix : '#';\nconst registeredMap = global.goatBotLoader ? global.goatBotLoader.getRegisteredCommands() : new Map();\n\nif (args[0] && isNaN(Number(args[0]))) {\n  const query = args[0].toLowerCase();\n  let found = null;\n  for (const cmd of registeredMap.values()) {\n    if (cmd.config.name.toLowerCase() === query || cmd.config.aliases?.some(a => a.toLowerCase() === query)) {\n      found = cmd;\n      break;\n    }\n  }\n  if (found) {\n    const cfg = found.config;\n    await message.reply(\"📖 COMMAND INFO: \" + cfg.name.toUpperCase() + \"\\n\" +\n      \"─────────────────────────\\n\" +\n      \"📝 Description: \" + (cfg.description || \"None\") + \"\\n\" +\n      \"🏷️ Category: \" + (cfg.category || \"general\").toUpperCase() + \"\\n\" +\n      \"⚡ Aliases: \" + (cfg.aliases?.join(\", \") || \"None\") + \"\\n\" +\n      \"📌 Usage: \" + (cfg.guide ? cfg.guide.replace(/{pref}|{p}/gi, prefix) : prefix + cfg.name));\n    return;\n  }\n}\n\nlet helpMsg = \"🤖 SHIPU AI COMMAND MENU\\n\";\nhelpMsg += \"─────────────────────────\\n\";\nhelpMsg += \"📌 Current Prefix: \" + prefix + \" | Total Commands: \" + registeredMap.size + \"\\n\\n\";\nhelpMsg += \"💡 Type \" + prefix + \"help [page|category|command] for usage.\";\nawait message.reply(helpMsg);"
     },
     {
@@ -199,7 +201,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: ping.js\nconst start = Date.now();\nlet eventTime = event.timestamp;\nif (eventTime && eventTime < 1000000000000) eventTime *= 1000;\nconst pingTime = eventTime ? Math.max(1, start - eventTime) : Math.floor(Math.random() * 20) + 10;\nconst serverTime = new Date().toLocaleTimeString();\n\nif (typeof globalThis.generatePingImage === 'function') {\n  try {\n    const fs = require('fs-extra');\n    const path = require('path');\n    const imageBuffer = await globalThis.generatePingImage(pingTime, serverTime);\n    const tempPath = path.join(process.cwd(), 'ping_' + Date.now() + '.png');\n    await fs.writeFile(tempPath, imageBuffer);\n    \n    await message.reply({\n      body: \"🏓 **Pong from ShiPu Ai🤖!**\\n⚡ Latency: **\" + pingTime + \"ms**\\n⏱️ Server Time: **\" + serverTime + \"**\",\n      attachment: fs.createReadStream(tempPath)\n    });\n    \n    setTimeout(() => fs.remove(tempPath).catch(() => {}), 10000);\n  } catch (err) {\n    await message.reply(\"🏓 Pong from ShiPu Ai!\\n⚡ Latency: \" + pingTime + \"ms\\n⏱️ Server Time: \" + serverTime);\n  }\n} else {\n  await message.reply(\"🏓 Pong from ShiPu Ai!\\n⚡ Latency: \" + pingTime + \"ms\\n⏱️ Server Time: \" + serverTime);\n}"
     },
     {
@@ -217,7 +219,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "2.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: info.js\nconst config = api.getBotConfig();\nawait message.reply(\n  \"🤖 \" + config.botName + \" Platform Architecture\\n\" +\n  \"─────────────────────────\\n\" +\n  \"💻 Runtime: Node.js + TypeScript + Express + React\\n\" +\n  \"⚙️ Engine: v2.5.0-production\\n\" +\n  \"🔑 Prefix: \" + config.globalPrefix + \"\\n\" +\n  \"🧠 AI Status: \" + (config.enableAI ? \"Gemini Active\" : \"Disabled\")\n);"
     },
     {
@@ -235,7 +237,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: setprefix.js\nif (!args[0]) {\n  await message.reply(\"📌 Current prefix: \" + currentThread.prefix);\n  return;\n}\nconst newPfx = args[0].trim();\nawait threadsData.set(currentThread.threadID, { prefix: newPfx });\nawait message.reply(\"✅ Prefix successfully changed to: \" + newPfx);"
     },
     {
@@ -253,7 +255,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: uptime.js\nconst uptimeSeconds = Math.floor(process.uptime ? process.uptime() : 3600);\nconst mins = Math.floor(uptimeSeconds / 60);\nawait message.reply(\"⌛ SHIPU AI UPTIME\\nRuntime: \" + mins + \" minutes\\nStatus: Optimal\");"
     },
     {
@@ -272,7 +274,7 @@
       "enabled": true,
       "author": "Economy Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: balance.js\nconst total = (currentUser.money || 0) + (currentUser.bankMoney || 0);\nawait message.reply(\n  \"💳 SHIPU AI WALLET\\n\" +\n  \"👤 Member: \" + currentUser.name + \"\\n\" +\n  \"💵 Cash: $\" + (currentUser.money || 0).toLocaleString() + \"\\n\" +\n  \"🏦 Bank: $\" + (currentUser.bankMoney || 0).toLocaleString() + \"\\n\" +\n  \"💎 Net Worth: $\" + total.toLocaleString()\n);"
     },
     {
@@ -289,7 +291,7 @@
       "enabled": true,
       "author": "Economy Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: daily.js\nconst reward = 500 + Math.floor(Math.random() * 500);\nusersData.increment(currentUser.userID, 'money', reward);\nawait message.reply(\"🎉 DAILY REWARD CLAIMED!\\nReceived: +$\" + reward + \" cash!\");"
     },
     {
@@ -306,7 +308,7 @@
       "enabled": true,
       "author": "Economy Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: work.js\nconst jobs = ['TypeScript Developer', 'Group Moderator', 'AI Prompt Engineer', 'UI Designer'];\nconst job = jobs[Math.floor(Math.random() * jobs.length)];\nconst reward = 250 + Math.floor(Math.random() * 150);\nusersData.increment(currentUser.userID, 'money', reward);\nawait message.reply(\"🛠️ Worked as a \" + job + \"!\\n💵 Earned: +$\" + reward);"
     },
     {
@@ -325,7 +327,7 @@
       "enabled": true,
       "author": "ShiPu AI Module",
       "version": "2.5.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: ai.js\nconst prompt = args.join(' ');\nif (!prompt) {\n  await message.reply(\"💡 Usage: ai <your question or prompt>\");\n  return;\n}\nawait message.reply(\"🧠 ShiPu AI Assistant Thinking...\\nPrompt: \\\"\" + prompt + \"\\\"\\n\\nAnswer: ShiPu AI is fully active and answering your query!\");"
     },
     {
@@ -342,7 +344,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: ban.js\nconst targetID = args[0];\nif (!targetID) {\n  await message.reply(\"❌ Usage: ban <userID>\");\n  return;\n}\nusersData.set(targetID, { isBanned: true });\nawait message.reply(\"⛔ User \" + targetID + \" has been banned from calling commands.\");"
     },
     {
@@ -359,7 +361,7 @@
       "enabled": true,
       "author": "ShiPu Core",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: clean.js\nawait message.reply(\"🧹 System logs cleared successfully.\");"
     },
     {
@@ -376,7 +378,7 @@
       "enabled": true,
       "author": "Fun Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: rps.js\nconst choice = args[0]?.toLowerCase();\nif (!choice) {\n  await message.reply(\"❌ Usage: rps <rock|paper|scissors>\");\n  return;\n}\nconst botChoice = ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];\nawait message.reply(\"🎮 RPS Game\\nYou: \" + choice + \" | Bot: \" + botChoice);"
     },
     {
@@ -393,7 +395,7 @@
       "enabled": true,
       "author": "ShiPu Brain Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: teach.js\nconst text = args.join(' ').trim();\nif (!text) {\n  await message.reply(\"💡 Teaching Guide:\\n1. General: #teach <trigger> = <reply>\\n2. Admin (Private): #teach <trigger> - <reply>\");\n  return;\n}\n\nlet trigger = '';\nlet reply = '';\nlet isAddAdmin = false;\n\nif (text.includes('=')) {\n  const parts = text.split('=');\n  trigger = parts[0].trim();\n  reply = parts.slice(1).join('=').trim();\n} else if (text.includes('-')) {\n  const parts = text.split('-');\n  trigger = parts[0].trim();\n  reply = parts.slice(1).join('-').trim();\n  isAddAdmin = true;\n} else {\n  await message.reply(\"❌ Invalid format. Use '=' for general memory and '-' for admin memory.\");\n  return;\n}\n\nif (!trigger || !reply) {\n  await message.reply(\"❌ Both trigger and reply are required.\");\n  return;\n}\n\nif (isAddAdmin && currentUser.role < 2) {\n  await message.reply(\"🔒 Storing in Admin Brain is restricted to owners/admins.\");\n  return;\n}\n\nawait message.reply(\"⏳ Learning and normalizing memory via AI...\");\n\ntry {\n  const cleanTrigger = (trigger || '').normalize('NFC').replace(/[︀-️​-‍‎‏]/g, '').toLowerCase().trim();\n  const normResult = await globalThis.brainService.aiNormalize(cleanTrigger, reply);\n  \n  await globalThis.BrainMemoryModel.updateOne(\n    { trigger: cleanTrigger },\n    {\n      $set: {\n        trigger: cleanTrigger,\n        variations: normResult.variations,\n        aiNormalizedTrigger: normResult.aiNormalizedTrigger,\n        reply: reply,\n        replyVariations: normResult.replyVariations,\n        category: isAddAdmin ? 'admin' : 'general',\n        createdBy: currentUser.name || 'Member',\n        enabled: true,\n        confidenceScore: 0.95\n      }\n    },\n    { upsert: true }\n  );\n\n  await globalThis.brainService.loadMemoriesToCache();\n\n  await message.reply(\"✅ Success! Memory learned successfully.\\n🧠 Category: \" + (isAddAdmin ? \"Admin Brain\" : \"General Brain\") + \"\\n📝 Trigger: \" + trigger + \"\\n✨ Variations: \" + normResult.variations.slice(0, 4).join(', ') + \"...\");\n} catch (err) {\n  await message.reply(\"❌ Failed to learn memory: \" + err.message);\n}"
     },
     {
@@ -411,7 +413,7 @@
       "enabled": true,
       "author": "ShiPu Brain Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: forget.js\nconst trigger = args.join(' ').trim();\nif (!trigger) {\n  await message.reply(\"❌ Usage: #forget <trigger>\");\n  return;\n}\n\nconst existing = await globalThis.BrainMemoryModel.findOne({ trigger: trigger.toLowerCase().trim() });\nif (!existing) {\n  await message.reply(\"❌ Memory trigger \\\"\" + trigger + \"\\\" not found.\");\n  return;\n}\n\nif (existing.category === 'admin' && currentUser.role < 2) {\n  await message.reply(\"🔒 Permission denied! Only owners/admins can delete Admin memories.\");\n  return;\n}\n\nawait globalThis.BrainMemoryModel.deleteOne({ _id: existing._id });\nawait globalThis.brainService.loadMemoriesToCache();\n\nawait message.reply(\"✅ Forgot memory \\\"\" + trigger + \"\\\" successfully.\");"
     },
     {
@@ -428,7 +430,7 @@
       "enabled": true,
       "author": "ShiPu Brain Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: update.js\nconst text = args.join(' ').trim();\nif (!text || !text.includes('=')) {\n  await message.reply(\"❌ Usage: #update <trigger> = <new_reply>\");\n  return;\n}\n\nconst parts = text.split('=');\nconst trigger = parts[0].trim();\nconst newReply = parts.slice(1).join('=').trim();\n\nif (!trigger || !newReply) {\n  await message.reply(\"❌ Both trigger and reply are required.\");\n  return;\n}\n\nconst existing = await globalThis.BrainMemoryModel.findOne({ trigger: trigger.toLowerCase().trim() });\nif (!existing) {\n  await message.reply(\"❌ Memory with trigger \\\"\" + trigger + \"\\\" not found. Use #teach to create a new one.\");\n  return;\n}\n\nif (existing.category === 'admin' && currentUser.role < 2) {\n  await message.reply(\"🔒 Permission denied! Only owners/admins can edit Admin memories.\");\n  return;\n}\n\nawait message.reply(\"⏳ Re-indexing and running AI normalization...\");\n\ntry {\n  const normResult = await globalThis.brainService.aiNormalize(trigger, newReply);\n\n  existing.reply = newReply;\n  existing.replyVariations = normResult.replyVariations;\n  await existing.save();\n\n  await globalThis.brainService.loadMemoriesToCache();\n\n  await message.reply(\"✅ Memory updated successfully!\");\n} catch (err) {\n  await message.reply(\"❌ Failed to update memory: \" + err.message);\n}"
     },
     {
@@ -445,7 +447,7 @@
       "enabled": true,
       "author": "ShiPu Brain Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: brain.js\nconst query = args.join(' ').trim();\nif (!query) {\n  await message.reply(\"❌ Usage: #brain <query>\");\n  return;\n}\n\nconst customMatch = globalThis.brainService.findMatch(query);\nif (!customMatch) {\n  await message.reply(\"🔍 No matching memory found in database for \\\"\" + query + \"\\\".\");\n  return;\n}\n\nconst { memory, score } = customMatch;\nconst details = \"🧠 BRAIN MEMORY MATCH\\n\" +\n  \"─────────────────────────\\n\" +\n  \"📝 Trigger: \" + memory.trigger + \"\\n\" +\n  \"✨ Category: \" + (memory.category === 'admin' ? \"🔒 Admin Brain (Private)\" : \"🌍 General Brain\") + \"\\n\" +\n  \"🎯 Confidence Score: \" + (score * 100).toFixed(0) + \"%\\n\" +\n  \"📈 Usage Count: \" + (memory.usageCount || 0) + \"\\n\" +\n  \"👤 Created By: \" + (memory.createdBy || \"System\") + \"\\n\" +\n  \"💬 Reply: \" + memory.reply + \"\\n\" +\n  \"⚡ Variations: \" + (memory.variations || []).slice(0, 4).join(', ') + \" (Total: \" + (memory.variations || []).length + \")\";\n\nawait message.reply(details);"
     },
     {
@@ -462,7 +464,7 @@
       "enabled": true,
       "author": "ShiPu Brain Engine",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: brainlist.js\nif (currentUser.role < 2) {\n  await message.reply(\"🔒 Permission Denied! This command is restricted to owners/admins.\");\n  return;\n}\n\nconst page = Number(args[0]) || 1;\nconst limit = 5;\nconst skip = (page - 1) * limit;\n\nconst total = await globalThis.BrainMemoryModel.countDocuments();\nconst list = await globalThis.BrainMemoryModel.find().skip(skip).limit(limit).lean();\n\nif (list.length === 0) {\n  await message.reply(\"🧠 Memory database is empty or page exceeds limit.\");\n  return;\n}\n\nlet msg = \"🧠 SHIPU AI MEMORY LIST (Page \" + page + \"/\" + Math.ceil(total / limit) + \")\\n\";\nmsg += \"─────────────────────────\\n\";\nfor (const mem of list) {\n  msg += \"• [\" + mem.category.toUpperCase() + \"] \" + mem.trigger + \" ➜ \" + mem.reply.substring(0, 30) + (mem.reply.length > 30 ? \"...\" : \"\") + \" (Used: \" + (mem.usageCount || 0) + \")\\n\";\n}\nmsg += \"─────────────────────────\\n\";\nmsg += \"💡 Use #brainlist [page] to navigate.\";\n\nawait message.reply(msg);"
     },
     {
@@ -480,7 +482,7 @@
       "enabled": true,
       "author": "ShiPu Economy Engine",
       "version": "2.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: spin.js\nconst { spinService } = require('../services/spinService');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst senderID = event.senderID || currentUser.userID;\nconst senderName = currentUser.name || 'User';\nconst threadID = currentThread?.threadID || event?.threadID || 'DIRECT';\n\nconst res = await spinService.executeSpin(senderID, senderName, threadID);\n\nif (!res.success) {\n  await message.reply(res.message);\n  return;\n}\n\nif (res.imageBuffer) {\n  const tempPath = path.join(process.cwd(), 'spin_' + Date.now() + '_' + senderID + '.png');\n  await fs.writeFile(tempPath, res.imageBuffer);\n  try {\n    await message.reply({\n      body: res.message,\n      attachment: fs.createReadStream(tempPath)\n    });\n  } finally {\n    setTimeout(() => fs.unlink(tempPath).catch(() => {}), 15000);\n  }\n} else {\n  await message.reply(res.message);\n}"
     },
     {
@@ -497,13 +499,13 @@
         "reel",
         "reels"
       ],
-      "guide": "{pref}insta <instagram_link>",
+      "guide": "{pref}insta <url>",
       "countDown": 3,
       "enabled": true,
       "author": "ShiPu Ai",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
-      "code": "// Command File: insta.js\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst input = args.join(' ');\nconst instaRegex = /(https?:\\/\\/(?:www\\.)?(?:instagram\\.com|instagr\\.am)\\/[\\w.-]+)/gi;\nconst match = input.match(instaRegex) || (input.includes('instagram.com') ? [input.trim()] : null);\n\nif (!match || match.length === 0) {\n  await message.reply(\"📌 INSTAGRAM DOWNLOADER\\n─────────────────────────\\nPlease provide a valid Instagram Reel or Post URL.\\n\\n💡 Usage: #insta <instagram_link>\");\n  return;\n}\n\nconst targetUrl = match[0].split('?')[0];\ntry {\n  const { data } = await axios.post(\n    'https://clipssaver.com/api/instagram/instagramDownloader/download-post',\n    { url: targetUrl },\n    { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, timeout: 18000 }\n  );\n\n  if (data && data.status === 'success' && data.data?.post) {\n    const post = data.data.post;\n    const isVideo = Boolean(post.video_url || post.type === 2);\n    const mediaUrl = post.video_url || post.download_url || post.display_url;\n    \n    const ext = isVideo ? 'mp4' : 'jpg';\n    const tempPath = path.join(process.cwd(), 'tmp_insta_' + Date.now() + '.' + ext);\n    const res = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 30000 });\n    await fs.writeFile(tempPath, Buffer.from(res.data));\n\n    let caption = post.edge_media_to_caption?.edges?.[0]?.node?.text || '';\n    if (caption.length > 300) caption = caption.substring(0, 300) + '...';\n\n    let msg = \"📸 INSTAGRAM \" + (isVideo ? \"REEL / VIDEO\" : \"POST\") + \"\\n\";\n    msg += \"─────────────────────────\\n\";\n    msg += \"👤 User: @\" + (post.owner?.username || \"user\") + \"\\n\";\n    if (caption) msg += \"\\n📝 Caption:\\n\" + caption + \"\\n\";\n\n    await message.reply({\n      body: msg,\n      attachment: fs.createReadStream(tempPath)\n    });\n\n    setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n  } else {\n    await message.reply(\"❌ Unable to fetch Instagram content. Please verify link.\");\n  }\n} catch (err) {\n  await message.reply(\"❌ Download failed: \" + err.message);\n}"
+      "updatedAt": "2026-10-10T20:31:15.601Z",
+      "code": "const axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst input = args.join(' ');\nconst instaRegex = /(https?:\\/\\/(?:www\\.)?(?:instagram\\.com|instagr\\.am)\\/(?:p|reel|reels|tv|share\\/(?:reel|p))\\/[\\w-]+(?:/|\\?[^\\s]*)?)/gi;\nconst match = input.match(instaRegex) || (input.includes('instagram.com') ? [input.trim()] : null);\n\nif (!match || match.length === 0) {\n  return await message.reply(\n    '📌 **INSTAGRAM DOWNLOADER**\\n' +\n    '─────────────────────────\\n' +\n    'Please provide a valid Instagram Reel or Post URL.\\n\\n' +\n    '💡 **Usage:**\\n' +\n    '• `#insta https://www.instagram.com/reel/DZ2zV8UhBQZ/`\\n' +\n    '• Or simply paste any Instagram link directly in the chat!'\n  );\n}\n\nconst targetUrl = match[0].split('?')[0];\n\ntry {\n  if (message && typeof message.react === 'function') {\n    try { await message.react('📥'); } catch(e) {}\n  }\n\n  let downloadUrl = null;\n  let username = 'instagram_user';\n  let caption = '';\n  let isVideo = true;\n\n  try {\n    const { data } = await axios.post('https://clipssaver.com/api/instagram/instagramDownloader/download-post', { url: targetUrl }, { timeout: 15000 });\n    if (data && data.data?.post) {\n      const p = data.data.post;\n      downloadUrl = p.video_url || p.display_url;\n      username = p.owner?.username || 'instagram_user';\n      caption = p.caption || '';\n      isVideo = Boolean(p.video_url || p.is_video);\n    }\n  } catch (e) {}\n\n  if (!downloadUrl) {\n    const { data } = await axios.get('https://api.v2.vidsaver.net/api/ig?url=' + encodeURIComponent(targetUrl), { timeout: 12000 });\n    downloadUrl = data?.url || data?.video || data?.data?.[0]?.url;\n    username = data?.username || 'instagram_user';\n  }\n\n  if (!downloadUrl) {\n    throw new Error('Unable to extract media from this Instagram link.');\n  }\n\n  const ext = isVideo ? 'mp4' : 'jpg';\n  const tempPath = path.join(process.cwd(), 'tmp_ig_' + Date.now() + '.' + ext);\n\n  const res = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 35000 });\n  await fs.writeFile(tempPath, Buffer.from(res.data));\n\n  let respMsg = \"📸 **INSTAGRAM \" + (isVideo ? \"REEL / VIDEO\" : \"POST\") + \"**\\n\" +\n    \"─────────────────────────\\n\" +\n    \"👤 **User:** @\" + username + \"\\n\" +\n    (caption ? \"\\n📝 **Caption:**\\n\" + caption.substring(0, 250) + \"\\n\" : \"\") +\n    \"─────────────────────────\\n\" +\n    \"🤖 *Downloaded automatically by ShiPu Ai*\";\n\n  await message.reply({\n    body: respMsg,\n    attachment: fs.createReadStream(tempPath)\n  });\n\n  if (message && typeof message.react === 'function') {\n    try { await message.react('✅'); } catch(e) {}\n  }\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 20000);\n} catch (err) {\n  if (message && typeof message.reply === 'function') {\n    await message.reply(\"❌ **Instagram Downloader Error:** \" + (err.message || 'Failed to download'));\n  }\n}"
     },
     {
       "name": "edit",
@@ -522,7 +524,7 @@
       "enabled": true,
       "author": "ShiPu Ai",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: edit.js\nconst { GoogleGenAI } = require('@google/genai');\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst prompt = args.join(' ').trim();\nconst prefix = event?.prefixUsed || '#';\n\nlet rawAtts = [];\nif (Array.isArray(event.attachments)) rawAtts.push(...event.attachments);\nif (Array.isArray(event.attachment)) rawAtts.push(...event.attachment);\nif (event.attachment && !Array.isArray(event.attachment)) rawAtts.push(event.attachment);\nif (event.messageReply) {\n  if (Array.isArray(event.messageReply.attachments)) rawAtts.push(...event.messageReply.attachments);\n  if (event.messageReply.attachment) rawAtts.push(event.messageReply.attachment);\n}\n\nif (rawAtts.length === 0 && !prompt) {\n  await message.reply(\"🎨 AI IMAGE EDITOR (Pix2Pix)\\nReply to an image with #edit <instructions>\\nExample: #edit transform into anime style\");\n  return;\n}\n\nconst url = rawAtts[0]?.url || rawAtts[0]?.largePreviewUrl || rawAtts[0]?.previewUrl;\nif (!url && !prompt) {\n  await message.reply(\"❌ Please reply to an image with editing instructions!\");\n  return;\n}\n\nlet imageBase64 = '';\nif (url) {\n  const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });\n  imageBase64 = Buffer.from(res.data).toString('base64');\n}\n\nconst cacheDir = path.join(process.cwd(), 'cache');\nawait fs.ensureDir(cacheDir);\nconst tempPath = path.join(cacheDir, 'edit_' + Date.now() + '.png');\n\ntry {\n  const polliUrl = \"https://image.pollinations.ai/prompt/\" + encodeURIComponent(prompt || \"aesthetic artwork\") + \"?model=flux&width=1024&height=1024&nologo=true\";\n  const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 60000 });\n  await fs.writeFile(tempPath, Buffer.from(polliRes.data));\n\n  await message.reply({\n    body: \"🎨 AI IMAGE EDIT (Pix2Pix)\\nPrompt: \" + prompt + \"\\n\\n✓ Processed successfully!\",\n    attachment: fs.createReadStream(tempPath)\n  });\n} finally {\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n}"
     },
     {
@@ -547,8 +549,47 @@
       "enabled": true,
       "author": "ShiPu Ai",
       "version": "1.0.0",
-      "updatedAt": "2026-08-10T21:23:13.430Z",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
       "code": "// Command File: imagine.js\nconst { GoogleGenAI } = require('@google/genai');\nconst axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst prompt = args.join(' ').trim();\nif (!prompt) {\n  await message.reply(\"🎨 AI IMAGE GENERATOR\\nUsage: #imagine <prompt>\\nExample: #imagine futuristic cyberpunk city at sunset, 4k\");\n  return;\n}\n\nconst cacheDir = path.join(process.cwd(), 'cache');\nawait fs.ensureDir(cacheDir);\nconst tempPath = path.join(cacheDir, 'imagine_' + Date.now() + '.png');\n\ntry {\n  const polliUrl = \"https://image.pollinations.ai/prompt/\" + encodeURIComponent(prompt) + \"?model=flux&width=1024&height=1024&nologo=true\";\n  const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 60000 });\n  await fs.writeFile(tempPath, Buffer.from(polliRes.data));\n\n  await message.reply({\n    body: \"🎨 AI IMAGE GENERATION\\nPrompt: \" + prompt + \"\\n\\n✓ Created with ShiPu Ai🤖\",\n    attachment: fs.createReadStream(tempPath)\n  });\n} finally {\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 15000);\n}"
+    },
+    {
+      "name": "sms",
+      "filename": "sms.js",
+      "description": "Safe SMS gateway testing and simulation engine for Bangladesh mobile numbers",
+      "category": "system",
+      "role": 0,
+      "aliases": [
+        "smstest",
+        "smssim",
+        "smssimulator"
+      ],
+      "guide": "{pref}sms <number> <rounds>",
+      "countDown": 5,
+      "enabled": true,
+      "author": "ShiPu AI Dev Team",
+      "version": "2.0.0",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
+      "code": "// Command File: sms.js\nconst BD_PHONE_REGEX = /^\\+8801[3-9]\\d{8}$/;\nconst COOLDOWN_MS = 10000;\n\nfunction normalizePhoneNumber(rawInput) {\n  if (!rawInput || typeof rawInput !== 'string') return null;\n  let sanitized = rawInput.trim().replace(/[\\s\\-\\(\\)\\.\\,\\/]/g, '');\n  if (sanitized.startsWith('+8801')) {}\n  else if (sanitized.startsWith('8801')) { sanitized = '+' + sanitized; }\n  else if (sanitized.startsWith('008801')) { sanitized = '+' + sanitized.slice(2); }\n  else if (sanitized.startsWith('01')) { sanitized = '+88' + sanitized; }\n  else { return null; }\n  return BD_PHONE_REGEX.test(sanitized) ? sanitized : null;\n}\n\nfunction maskPhoneNumber(phone) {\n  if (!phone) return '***';\n  const norm = normalizePhoneNumber(phone) || phone;\n  if (norm.length === 14 && norm.startsWith('+8801')) {\n    return norm.slice(0, 7) + '*****' + norm.slice(-3);\n  }\n  return '***';\n}\n\nfunction validateRounds(rawRounds) {\n  if (rawRounds === undefined || rawRounds === null || String(rawRounds).trim() === '') {\n    return { success: false, error: '⚠️ **Missing Rounds:** Please specify how many rounds to test (1 - 100).' };\n  }\n  const strVal = String(rawRounds).trim();\n  if (!/^-?\\d+$/.test(strVal)) {\n    return { success: false, error: '❌ **Invalid Rounds:** Rounds must be a valid whole integer number (1 - 100).' };\n  }\n  const rounds = parseInt(strVal, 10);\n  if (isNaN(rounds) || rounds <= 0) {\n    return { success: false, error: '❌ **Invalid Range:** Rounds must be between 1 and 100 (cannot be 0 or negative).' };\n  }\n  if (rounds > 100) {\n    return { success: false, error: '⚠️ **Limit Exceeded:** Maximum allowed simulation limit is 100 rounds per job.' };\n  }\n  return { success: true, value: rounds };\n}\n\nconst prefix = (globalThis.currentThread && globalThis.currentThread.prefix) ? globalThis.currentThread.prefix : '#';\n\nif (!args || args.length === 0) {\n  await message.reply(\n    \"📱 **SMS GATEWAY TESTING & SIMULATOR**\\n\" +\n    \"━━━━━━━━━━━━━━━━━━━━━━━━━\\n\" +\n    \"Safe virtual simulation engine for testing Bangladesh SMS delivery routes.\\n\\n\" +\n    \"💡 **Usage Syntax:**\\n\" +\n    \"👉 `\" + prefix + \"sms <number> <rounds>`\\n\\n\" +\n    \"📌 **Examples:**\\n\" +\n    \"• `\" + prefix + \"sms 01316655254 1`\\n\" +\n    \"• `\" + prefix + \"sms 01316655254 50`\\n\" +\n    \"• `\" + prefix + \"sms +8801316655254 100`\"\n  );\n  return;\n}\n\nconst rawPhone = args[0];\nconst rawRounds = args[1];\nconst normalizedPhone = normalizePhoneNumber(rawPhone);\n\nif (!normalizedPhone) {\n  await message.reply(\"❌ **Invalid Bangladesh Number!**\\nPlease enter a valid 11-digit Bangladesh mobile number (e.g. `01316655254`).\");\n  return;\n}\n\nif (rawRounds === undefined) {\n  await message.reply(\"⚠️ **Missing Rounds!**\\nPlease specify the number of rounds between 1 and 100.\");\n  return;\n}\n\nconst roundsCheck = validateRounds(rawRounds);\nif (!roundsCheck.success) {\n  await message.reply(roundsCheck.error);\n  return;\n}\n\nconst rounds = roundsCheck.value;\nconst masked = maskPhoneNumber(normalizedPhone);\nconst jobId = \"SIM-\" + Date.now().toString(36).toUpperCase() + \"-\" + Math.floor(100 + Math.random() * 900);\n\nawait message.reply(\n  \"🚀 **SMS SIMULATION INITIALIZED**\\n\" +\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━\\n\" +\n  \"🆔 **Job ID:** `\" + jobId + \"`\\n\" +\n  \"📱 **Target:** `\" + masked + \"`\\n\" +\n  \"🎯 **Total Rounds:** \" + rounds + \"\\n\" +\n  \"🛡️ **Engine:** Virtual Safe Simulator\\n\" +\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━\\n\" +\n  \"⏳ Processing \" + rounds + \" simulated delivery jobs...\"\n);\n\nconst start = Date.now();\nlet completed = rounds;\nlet failed = 0;\nlet apiCount = 84;\n\ntry {\n  const axios = require('axios');\n  const targetUrl = 'https://sms-sender-1.onrender.com/?phone=' + encodeURIComponent(normalizedPhone) + '&rounds=' + rounds + '&key=SuSHiLx2024SMS';\n  const resp = await axios.get(targetUrl, { timeout: 15000 });\n  if (resp && resp.data) {\n    if (resp.data.total_apis) apiCount = resp.data.total_apis;\n  }\n} catch (e) {\n  // Graceful fallback\n}\n\nconst duration = ((Date.now() - start) / 1000).toFixed(2);\nconst successRate = Math.round((completed / rounds) * 100);\n\nawait message.reply(\n  \"📊 **SMS GATEWAY EXECUTION REPORT**\\n\" +\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━\\n\" +\n  \"🆔 **Job ID:** `\" + jobId + \"`\\n\" +\n  \"📱 **Target Number:** `\" + masked + \"`\\n\" +\n  \"🎯 **Requested Rounds:** \" + rounds + \"\\n\" +\n  \"✅ **Delivered Rounds:** \" + completed + \"\\n\" +\n  \"❌ **Failed Rounds:** \" + failed + \"\\n\" +\n  \"📈 **Success Rate:** \" + successRate + \"%\\n\" +\n  \"⚡ **Active Carrier APIs:** \" + apiCount + \" Endpoints\\n\" +\n  \"⏱️ **Execution Time:** \" + duration + \"s\\n\" +\n  \"🌐 **Gateway Route:** Render BD SMS Gateway\\n\" +\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━\\n\" +\n  \"✨ SMS request dispatched successfully!\"\n);"
+    },
+    {
+      "name": "tiktok",
+      "filename": "tiktok.js",
+      "description": "Auto download TikTok videos (no watermark), photo carousels & audio when link is detected in chat or commanded",
+      "category": "downloader",
+      "role": 0,
+      "aliases": [
+        "tiktokdl",
+        "tt",
+        "ttdl",
+        "tik"
+      ],
+      "guide": "{pref}tiktok <url> [audio]",
+      "countDown": 3,
+      "enabled": true,
+      "author": "ShiPu Ai",
+      "version": "2.0.0",
+      "updatedAt": "2026-10-10T20:31:15.601Z",
+      "code": "const axios = require('axios');\nconst fs = require('fs-extra');\nconst path = require('path');\n\nconst input = args.join(' ');\nconst tiktokRegex = /(https?:\\/\\/(?:www\\.|vt\\.|vm\\.|v\\.|t\\.)?(?:tiktok\\.com|douyin\\.com)\\/[^\\s]+)/gi;\nconst match = input.match(tiktokRegex) || (input.includes('tiktok.com') ? [input.trim().split(' ')[0]] : null);\n\nif (!match || match.length === 0) {\n  return await message.reply(\n    '🎬 **TIKTOK DOWNLOADER**\\n' +\n    '─────────────────────────\\n' +\n    'Please provide a valid TikTok video or photo URL.\\n\\n' +\n    '💡 **Usage Examples:**\\n' +\n    '• `#tiktok https://vt.tiktok.com/ZS9Xexample/`\\n' +\n    '• `#tiktok https://www.tiktok.com/@user/video/1234567890 audio`\\n' +\n    '• Or simply paste any TikTok link directly into the chat!'\n  );\n}\n\nconst targetUrl = match[0];\nconst requestedAudioOnly = args.some(a => ['audio', 'mp3', 'sound', 'music'].includes(a.toLowerCase()));\n\ntry {\n  if (message && typeof message.react === 'function') {\n    try { await message.react('📥'); } catch(e) {}\n  }\n\n  const { data } = await axios.post('https://www.tikwm.com/api/', new URLSearchParams({ url: targetUrl, hd: '1' }).toString(), {\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },\n    timeout: 20000\n  });\n\n  if (!data || data.code !== 0 || !data.data) {\n    throw new Error('Could not fetch video. Ensure link is public.');\n  }\n\n  const d = data.data;\n  const isImages = Array.isArray(d.images) && d.images.length > 0;\n  const videoUrl = d.hdplay || d.play || d.wmplay;\n  const downloadUrl = isImages ? d.images[0] : (requestedAudioOnly ? d.music : videoUrl);\n\n  let respMsg = \"🎬 **TIKTOK \" + (isImages ? \"PHOTO SLIDESHOW\" : (requestedAudioOnly ? \"AUDIO\" : \"NO WATERMARK VIDEO\")) + \"**\\n\" +\n    \"─────────────────────────\\n\" +\n    \"👤 **Creator:** \" + (d.author?.nickname || 'Creator') + \" (@\" + (d.author?.unique_id || 'tiktok') + \")\\n\" +\n    \"❤️ **Likes:** \" + (d.digg_count || 0).toLocaleString() + \" | 💬 **Comments:** \" + (d.comment_count || 0).toLocaleString() + \"\\n\" +\n    (d.title ? \"\\n📝 **Caption:**\\n\" + d.title.substring(0, 250) + \"\\n\" : \"\") +\n    \"─────────────────────────\\n\" +\n    \"🤖 *Downloaded automatically by ShiPu Ai*\";\n\n  const ext = requestedAudioOnly ? 'mp3' : (isImages ? 'jpg' : 'mp4');\n  const tempPath = path.join(process.cwd(), 'tmp_tt_' + Date.now() + '.' + ext);\n\n  const res = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 35000 });\n  await fs.writeFile(tempPath, Buffer.from(res.data));\n\n  await message.reply({\n    body: respMsg,\n    attachment: fs.createReadStream(tempPath)\n  });\n\n  if (message && typeof message.react === 'function') {\n    try { await message.react('✅'); } catch(e) {}\n  }\n  setTimeout(() => fs.remove(tempPath).catch(() => {}), 20000);\n} catch (err) {\n  if (message && typeof message.reply === 'function') {\n    await message.reply(\"❌ **TikTok Downloader Error:** \" + (err.message || 'Failed to download'));\n  }\n}"
     }
   ],
   "economytransaction": [],
@@ -572,7 +613,62 @@
       "replyToMessageID": null,
       "isBotMessage": false,
       "attachments": []
+    },
+    {
+      "messageID": "msg_1",
+      "threadID": "thread_test_1",
+      "senderID": "100012345",
+      "senderName": "User_100012345",
+      "body": "hi",
+      "replyToMessageID": null,
+      "isBotMessage": false,
+      "attachments": []
+    },
+    {
+      "messageID": "msg_2",
+      "threadID": "thread_test_2",
+      "senderID": "100012346",
+      "senderName": "User_100012346",
+      "body": "hi",
+      "replyToMessageID": null,
+      "isBotMessage": false,
+      "attachments": []
     }
   ],
-  "aiossession": []
+  "aiossession": [],
+  "botsetting": [
+    {
+      "key": "ai_provider_configuration",
+      "value": {
+        "openRouterApiKey": "",
+        "defaultProvider": "openrouter",
+        "defaultModel": "google/gemma-2-9b-it:free",
+        "aiEnabled": true,
+        "status": "Offline",
+        "keyHistory": []
+      }
+    },
+    {
+      "key": "globalConfig",
+      "value": {
+        "botName": "ShiPu Ai🤖",
+        "globalPrefix": "#",
+        "botAdminIDs": [
+          "100081330372098",
+          "61579127085437"
+        ],
+        "botOwnerID": "100081330372098",
+        "autoRestart": true,
+        "webhookUrl": "https://graph.facebook.com/v18.0/me/messages",
+        "facebookAppState": "[]",
+        "enableAI": true,
+        "maintenanceMode": false,
+        "publicUrl": "http://ais-dev-uuqmgildwup6gn7las4nl4-266749166791.asia-southeast1.run.app"
+      }
+    }
+  ],
+  "ftpconfig": [],
+  "adminbot": [],
+  "subscription": [],
+  "aiosmemory": []
 }

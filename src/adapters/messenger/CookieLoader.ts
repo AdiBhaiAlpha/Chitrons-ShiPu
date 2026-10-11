@@ -31,7 +31,48 @@ export class CookieLoader {
   }
 
   /**
-   * Validates raw JSON content without exposing any cookie secret values
+   * Parse raw cookie string or JSON into standard cookie array
+   */
+  public static parseRawCookies(input: string): any[] | null {
+    if (!input || typeof input !== 'string' || !input.trim()) return null;
+    const trimmed = input.trim();
+
+    // 1. Try JSON parse
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : Object.values(parsed);
+      } catch {}
+    }
+
+    // 2. Try raw cookie header string (e.g., "c_user=1000...; xs=2%3A...; sb=...")
+    if (trimmed.includes('=') && (trimmed.includes('c_user') || trimmed.includes('i_user') || trimmed.includes('xs'))) {
+      const parts = trimmed.split(';').map(p => p.trim()).filter(Boolean);
+      const cookies: any[] = [];
+      for (const part of parts) {
+        const eqIdx = part.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = part.slice(0, eqIdx).trim();
+          const value = part.slice(eqIdx + 1).trim();
+          if (key) {
+            cookies.push({
+              key,
+              name: key,
+              value,
+              domain: '.facebook.com',
+              path: '/'
+            });
+          }
+        }
+      }
+      if (cookies.length > 0) return cookies;
+    }
+
+    return null;
+  }
+
+  /**
+   * Validates raw JSON or cookie string content without exposing any cookie secret values
    */
   public static validateCookieJson(rawJson: string): CookieValidationResult {
     if (!rawJson || typeof rawJson !== 'string' || !rawJson.trim()) {
@@ -41,24 +82,13 @@ export class CookieLoader {
       };
     }
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(rawJson);
-    } catch (err) {
+    const cookieArray = this.parseRawCookies(rawJson);
+    if (!cookieArray || !Array.isArray(cookieArray)) {
       return {
         valid: false,
-        error: 'Invalid Messenger session file. Please export a fresh cookie JSON and replace appstate_cookie.json.'
+        error: 'Invalid Messenger session format. Cookie must be an AppState JSON array or valid cookie header string.'
       };
     }
-
-    if (!Array.isArray(parsed) && typeof parsed !== 'object') {
-      return {
-        valid: false,
-        error: 'Invalid Messenger session format. Cookie export must be a JSON array of cookie objects.'
-      };
-    }
-
-    const cookieArray = Array.isArray(parsed) ? parsed : Object.values(parsed);
 
     if (cookieArray.length === 0) {
       return {
@@ -70,24 +100,25 @@ export class CookieLoader {
     // Inspect cookie fields safely without reading sensitive values
     let cUser: string | undefined;
     let hasEssentialKeys = false;
+    let hasXs = false;
 
     for (const cookie of cookieArray) {
       if (cookie && typeof cookie === 'object') {
         const key = cookie.key || cookie.name;
-        if (key === 'c_user') {
+        if (key === 'c_user' || key === 'i_user') {
           cUser = String(cookie.value || '');
           hasEssentialKeys = true;
         }
         if (key === 'xs') {
-          hasEssentialKeys = true;
+          hasXs = true;
         }
       }
     }
 
-    if (!hasEssentialKeys) {
+    if (!hasEssentialKeys || !hasXs) {
       return {
         valid: false,
-        error: 'Invalid session structure. Essential Facebook authentication keys (c_user/xs) are missing.'
+        error: 'Invalid session structure. Essential Facebook authentication keys (c_user/i_user and xs) are missing.'
       };
     }
 
@@ -125,8 +156,7 @@ export class CookieLoader {
         return { parsedCookies: null, validation };
       }
 
-      const parsed = JSON.parse(raw);
-      const cookieArray = Array.isArray(parsed) ? parsed : Object.values(parsed);
+      const cookieArray = this.parseRawCookies(raw);
       return { parsedCookies: cookieArray, validation };
     } catch (err: any) {
       return {

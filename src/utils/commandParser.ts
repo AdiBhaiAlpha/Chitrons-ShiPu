@@ -76,26 +76,27 @@ export function parseCommand(body: string, prefix: string): ParsedCommand {
     return notACommand;
   }
 
-  // Support "shipu ai <message>", "shipu ai", "#shipu ai <message>", "#shipu ai" triggers
+  // Support "shipu <message>", "shipu ai <message>", "shipu", "shipu ai", "#shipu <message>", "#shipu ai <message>" triggers
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const shipuAiRegex = new RegExp(`^(?:${escapedPrefix})?shipu\\s+ai(?:\\s+([\\s\\S]*))?$`, 'i');
+  const shipuAiRegex = new RegExp(`^(?:${escapedPrefix})?shipu(?:\\s+ai)?(?:\\s+([\\s\\S]*))?$`, 'i');
   const shipuAiMatch = normalizedBody.match(shipuAiRegex);
 
   if (shipuAiMatch) {
+    const hasPrefix = normalizedBody.toLowerCase().startsWith(prefix.toLowerCase());
     const rawArgs = shipuAiMatch[1] ? shipuAiMatch[1].trim() : '';
     let args: string[] = [];
     if (rawArgs) {
       args = rawArgs.split(/\s+/);
-    } else {
-      // Standalone "shipu ai" triggers "shipu on" to start the 10-minute session
+    } else if (!hasPrefix || /\bshipu\s+ai$/i.test(normalizedBody)) {
+      // Standalone "shipu" or "shipu ai" triggers "shipu on" to start the session
       args = ['on'];
     }
     return {
       isCommand: true,
       commandName: 'shipu',
       args,
-      rawArgs: rawArgs || 'on',
-      prefixUsed: normalizedBody.toLowerCase().startsWith(prefix.toLowerCase()) ? prefix : null
+      rawArgs: args.join(' '),
+      prefixUsed: hasPrefix ? prefix : null
     };
   }
 

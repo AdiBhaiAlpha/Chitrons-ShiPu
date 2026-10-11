@@ -2,7 +2,6 @@ import { AccountConnection, SafeAccountMeta } from './AccountConnection';
 import { messengerAccountsData, MessengerAccountRecord, ftpConfigData } from '../../db/database';
 import { CookieLoader } from './CookieLoader';
 import { FCAFallbackManager } from './fca/FCAFallbackManager';
-import { coerceAppState } from './fca/normalizeAppState';
 import { messengerLogger, MessengerLogger } from './MessengerLogger';
 import { encryptAuthState, encryptPassword, decryptAuthState } from '../../utils/crypto';
 import { IMessengerAdapter, MessengerAdapterImpl } from './MessengerAdapter';
@@ -393,6 +392,20 @@ export class MultiAccountManager {
       });
 
       messengerLogger.success('SYSTEM', `Legacy cookie file successfully migrated to MongoDB account ${accountId}`);
+    } else {
+      // Check if disk cookie was refreshed/updated
+      let currentDbCookie = '';
+      try { currentDbCookie = decryptAuthState(existing.encryptedAuthState); } catch {}
+      const diskCookies = JSON.stringify(parsedCookies);
+      if (currentDbCookie !== diskCookies) {
+        messengerLogger.info('SYSTEM', `Detected fresh appstate_cookie.json on disk for UID ${MessengerLogger.maskUid(validation.userId)}. Synchronizing database...`);
+        const encryptedState = encryptAuthState(diskCookies);
+        await messengerAccountsData.update(existing.accountId, {
+          encryptedAuthState: encryptedState,
+          status: 'PENDING',
+          lastValidatedAt: Date.now()
+        });
+      }
     }
   }
 
@@ -491,15 +504,7 @@ export class MultiAccountManager {
 
     // 4. Authenticate against Facebook FCA before saving
     messengerLogger.info('AUTH', `Testing Facebook authentication for UID ${MessengerLogger.maskUid(uid)}...`);
-    let parsedCookies: any[];
-    try {
-      parsedCookies = coerceAppState(cookieJson);
-    } catch (parseErr: any) {
-      return {
-        success: false,
-        error: 'Cookie JSON could not be parsed. Export the appstate again from a logged-in facebook.com tab.'
-      };
-    }
+    const parsedCookies = JSON.parse(cookieJson);
     const authResult = await this.fallbackManager.authenticate(parsedCookies);
 
     if (!authResult.connection) {
@@ -559,14 +564,10 @@ export class MultiAccountManager {
       connection.registerEventListener(listener);
     }
 
-    this.accounts.set(accountId, connection);
-
-    // Hand the session that step 4 already authenticated over to the
-    // AccountConnection. Without this, connect() decrypts the freshly stored
-    // state and performs a SECOND Facebook login for the same account, which
-    // doubles login rate-limit exposure and orphans the first session's socket.
+    // Reuse already authenticated FCA connection from step 4 instead of repeating login
     connection.setFcaConnection(authResult.connection, authResult.activeProviderName);
-    await connection.connect();
+    this.accounts.set(accountId, connection);
+    connection.startMqttListener();
 
     // 6. Register/update known state in CloudAccountManager so polling knows it is active
     try {

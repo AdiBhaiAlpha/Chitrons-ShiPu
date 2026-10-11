@@ -75,7 +75,11 @@ async function processShipuAiResponse(senderID: string, threadID: string, rawTex
     }
   }
 
-  const isDirectCall = Boolean(headerPrefix) || Boolean(eventObj?.isDirectCommand);
+  const isDirectCall = Boolean(
+    headerPrefix ||
+    eventObj?.isDirectCommand ||
+    /^(?:#)?shipu(?:\s+ai)?(?:\s+|$)/i.test(rawText.trim())
+  );
   const now = Date.now();
 
   let isSessionValid = Boolean(
@@ -112,8 +116,10 @@ async function processShipuAiResponse(senderID: string, threadID: string, rawTex
       return;
     }
 
-    // Direct call (#shipu <q>, shipu ai <q>) or reply to bot: BYPASS limit to answer this single question!
-    sessionExpiredNoteNeeded = true;
+    // Only show session expired note if a previous session had actually expired or hit its message limit
+    if (session && (now >= session.expiresAt || (session.messageCount || 0) >= (session.maxMessages || 50))) {
+      sessionExpiredNoteNeeded = true;
+    }
 
     // Load memory context if available
     if (!session) {
@@ -297,8 +303,26 @@ async function processShipuAiResponse(senderID: string, threadID: string, rawTex
       }
     });
 
-    const resObj = JSON.parse(response.text || '{}');
-    let finalReply = resObj.reply || 'No response generated.';
+    let resObj: any = {};
+    const rawResText = (response.text || '').trim();
+    if (rawResText) {
+      try {
+        const cleanedJson = rawResText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        resObj = JSON.parse(cleanedJson);
+      } catch {
+        const jsonMatch = rawResText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            resObj = JSON.parse(jsonMatch[0]);
+          } catch {
+            resObj = { reply: rawResText };
+          }
+        } else {
+          resObj = { reply: rawResText };
+        }
+      }
+    }
+    let finalReply = resObj.reply || resObj.message || resObj.text || (typeof resObj === 'string' ? resObj : '') || rawResText || 'হ্যালো! আমি ShiPu AI 🤖। বলুন কীভাবে আপনাকে সাহায্য করতে পারি?';
 
     // Check if AI extracted an inferred attribute (relationship, nickname, communication_style)
     if (resObj.extractedAttribute && resObj.extractedAttribute.type && resObj.extractedAttribute.value) {
@@ -400,7 +424,26 @@ async function processShipuAiResponse(senderID: string, threadID: string, rawTex
     }
   } catch (err: any) {
     console.error('[AIOS Active Session Error]:', err.message);
-    await message.reply(`❌ AIOS Error: ${err.message}`);
+    try {
+      const { smartConversationBrain } = await import('./smartConversationBrain');
+      const brainFallback = smartConversationBrain.processMessage({
+        text: rawText.replace(/^(?:#)?shipu(?:\s+ai)?\s*/i, '').trim() || rawText,
+        threadID,
+        senderID,
+        prefix: '#',
+        botUid: botEngine.selfUserId || '',
+        botName: 'ShiPu Ai'
+      });
+      if (brainFallback && brainFallback.shouldReply && brainFallback.replyText) {
+        const fallbackReply = headerPrefix ? `${headerPrefix}\n\n${brainFallback.replyText}` : brainFallback.replyText;
+        await message.reply(fallbackReply);
+        return;
+      }
+    } catch {}
+    const friendlyFallback = headerPrefix
+      ? `${headerPrefix}\n\nহ্যালো! 👋 আমি **ShiPu AI** 🤖। আপনার মেসেজটি পেয়েছি! বলুন কীভাবে আপনাকে সাহায্য করতে পারি?`
+      : `হ্যালো! 👋 আমি **ShiPu AI** 🤖। বলুন কীভাবে আপনাকে সাহায্য করতে পারি?`;
+    await message.reply(friendlyFallback);
   }
 }
 

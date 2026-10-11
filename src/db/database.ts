@@ -11,7 +11,8 @@ import {
   MessengerAccountModel,
   PersonalAIAccountModel,
   TelegramConfigModel,
-  connectMongoDB
+  connectMongoDB,
+  executeFallback
 } from './mongodb';
 import { TelegramConfigRecord } from '../types/telegram';
 
@@ -100,13 +101,12 @@ export interface FtpConfigRecord {
 // Ensure MongoDB is connected before query
 async function ensureDb() {
   try {
-    const status = await connectMongoDB();
-    if (!status.connected) {
-      console.warn(`[DATABASE] MongoDB connection deferred or offline. Queries will fall back gracefully: ${status.error || 'Unknown error'}`);
+    if (mongoose.connection.readyState === 1) {
+      return { connected: true };
     }
+    const status = await connectMongoDB();
     return status;
   } catch (err: any) {
-    console.warn(`[DATABASE] MongoDB connection error. Queries will fall back gracefully: ${err.message || err}`);
     return { connected: false, error: err.message || String(err) };
   }
 }
@@ -696,7 +696,6 @@ export const messengerAccountsData = {
   getAll: async (): Promise<MessengerAccountRecord[]> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return [];
       const records = await MessengerAccountModel.find().lean();
       return records.map(r => mapRecord(r));
     } catch {
@@ -707,7 +706,6 @@ export const messengerAccountsData = {
   get: async (accountId: string): Promise<MessengerAccountRecord | null> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return null;
       const r: any = await MessengerAccountModel.findOne({ accountId } as any).lean();
       if (!r) return null;
       return mapRecord(r);
@@ -719,7 +717,6 @@ export const messengerAccountsData = {
   getByUid: async (uid: string): Promise<MessengerAccountRecord | null> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return null;
       const r: any = await MessengerAccountModel.findOne({ uid } as any).lean();
       if (!r) return null;
       return mapRecord(r);
@@ -731,7 +728,6 @@ export const messengerAccountsData = {
   getBySlotId: async (slotId: string): Promise<MessengerAccountRecord | null> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return null;
       const r: any = await MessengerAccountModel.findOne({ slotId } as any).lean();
       if (!r) return null;
       return mapRecord(r);
@@ -743,104 +739,122 @@ export const messengerAccountsData = {
   upsert: async (account: Partial<MessengerAccountRecord> & { accountId: string; uid: string; encryptedAuthState: string }): Promise<void> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return;
       const now = Date.now();
       let rawCookie = '';
       try {
         rawCookie = decryptPassword(account.encryptedAuthState);
       } catch (err) {}
 
+      const updatePayload = {
+        $set: {
+          uid: account.uid,
+          facebookUID: account.uid,
+          slotId: account.slotId || '',
+          botSlotId: account.slotId || '',
+          botId: account.botId || '',
+          ownerId: account.ownerId || '',
+          ownerUserId: account.ownerId || '',
+          cookie: rawCookie,
+          encryptedMongoUri: account.encryptedMongoUri || '',
+          dbName: account.dbName || '',
+          collectionPrefix: account.collectionPrefix || '',
+          connectionMode: account.connectionMode || 'default',
+          displayName: account.displayName || 'Facebook User',
+          accountName: account.displayName || 'Facebook User',
+          authType: account.authType || 'cookie',
+          provider: account.provider || 'DongDev FCA',
+          encryptedAuthState: account.encryptedAuthState,
+          authStateVersion: account.authStateVersion || 1,
+          status: account.status || 'VALIDATING',
+          mqttStatus: account.mqttStatus || 'OFF',
+          loginStatus: account.loginStatus || 'PENDING',
+          creationSource: account.creationSource || 'ADMIN_DASHBOARD',
+          source: account.source || (account.creationSource === 'CLIENT_SYNC' ? 'client' : 'admin'),
+          lastHeartbeat: account.lastHeartbeat || now,
+          lastSuccessfulLogin: account.lastSuccessfulLogin || 0,
+          retryCounter: account.retryCounter || 0,
+          failureReason: account.failureReason || '',
+          botEnabled: account.botEnabled ?? true,
+          enabled: account.enabled ?? true,
+          aiEnabled: account.aiEnabled ?? true,
+          personalAiEnabled: account.personalAiEnabled ?? false,
+          lastIncomingMessageAt: account.lastIncomingMessageAt || 0,
+          lastOutgoingMessageAt: account.lastOutgoingMessageAt || 0,
+          stats: account.stats || {
+            messagesToday: 0,
+            aiMessages: 0,
+            totalMessages: 0,
+            reconnects: 0,
+            uptimeMs: 0
+          },
+          lastValidatedAt: account.lastValidatedAt || now,
+          lastConnectedAt: account.lastConnectedAt || 0,
+          lastDisconnectedAt: account.lastDisconnectedAt || 0,
+          lastErrorCode: account.lastErrorCode || '',
+          lastErrorAt: account.lastErrorAt || 0,
+          reconnectCount: account.reconnectCount || 0,
+          updatedAt: now
+        },
+        $setOnInsert: {
+          accountId: account.accountId,
+          createdAt: now
+        }
+      };
+
       await MessengerAccountModel.updateOne(
         { accountId: account.accountId },
-        {
-          $set: {
-            uid: account.uid,
-            facebookUID: account.uid,
-            slotId: account.slotId || '',
-            botSlotId: account.slotId || '',
-            botId: account.botId || '',
-            ownerId: account.ownerId || '',
-            ownerUserId: account.ownerId || '',
-            cookie: rawCookie,
-            encryptedMongoUri: account.encryptedMongoUri || '',
-            dbName: account.dbName || '',
-            collectionPrefix: account.collectionPrefix || '',
-            connectionMode: account.connectionMode || 'default',
-            displayName: account.displayName || 'Facebook User',
-            accountName: account.displayName || 'Facebook User',
-            authType: account.authType || 'cookie',
-            provider: account.provider || 'DongDev FCA',
-            encryptedAuthState: account.encryptedAuthState,
-            authStateVersion: account.authStateVersion || 1,
-            status: account.status || 'VALIDATING',
-            mqttStatus: account.mqttStatus || 'OFF',
-            loginStatus: account.loginStatus || 'PENDING',
-            creationSource: account.creationSource || 'ADMIN_DASHBOARD',
-            source: account.source || (account.creationSource === 'CLIENT_SYNC' ? 'client' : 'admin'),
-            lastHeartbeat: account.lastHeartbeat || now,
-            lastSuccessfulLogin: account.lastSuccessfulLogin || 0,
-            retryCounter: account.retryCounter || 0,
-            failureReason: account.failureReason || '',
-            botEnabled: account.botEnabled ?? true,
-            enabled: account.enabled ?? true,
-            aiEnabled: account.aiEnabled ?? true,
-            personalAiEnabled: account.personalAiEnabled ?? false,
-            lastIncomingMessageAt: account.lastIncomingMessageAt || 0,
-            lastOutgoingMessageAt: account.lastOutgoingMessageAt || 0,
-            stats: account.stats || {
-              messagesToday: 0,
-              aiMessages: 0,
-              totalMessages: 0,
-              reconnects: 0,
-              uptimeMs: 0
-            },
-            lastValidatedAt: account.lastValidatedAt || now,
-            lastConnectedAt: account.lastConnectedAt || 0,
-            lastDisconnectedAt: account.lastDisconnectedAt || 0,
-            lastErrorCode: account.lastErrorCode || '',
-            lastErrorAt: account.lastErrorAt || 0,
-            reconnectCount: account.reconnectCount || 0,
-            updatedAt: now
-          },
-          $setOnInsert: {
-            accountId: account.accountId,
-            createdAt: now
-          }
-        },
+        updatePayload,
         { upsert: true }
       );
-    } catch (err) {
-      console.error(`Failed to upsert Messenger account ${account.accountId}:`, err);
+    } catch (err: any) {
+      console.warn(`[DATABASE] Model upsert error for ${account.accountId}, falling back:`, err?.message || err);
+      try {
+        executeFallback('MessengerAccount', 'updateOne', [
+          { accountId: account.accountId },
+          { ...account, updatedAt: Date.now() },
+          { upsert: true }
+        ]);
+      } catch (fbErr) {
+        console.error(`Failed to upsert Messenger account fallback ${account.accountId}:`, fbErr);
+      }
     }
   },
 
   update: async (accountId: string, updates: Partial<MessengerAccountRecord>): Promise<void> => {
+    const extra: any = {};
+    if (updates.uid !== undefined) extra.facebookUID = updates.uid;
+    if (updates.slotId !== undefined) extra.botSlotId = updates.slotId;
+    if (updates.ownerId !== undefined) extra.ownerUserId = updates.ownerId;
+    if (updates.displayName !== undefined) extra.accountName = updates.displayName;
+    if (updates.encryptedAuthState !== undefined) {
+       try {
+         extra.cookie = decryptPassword(updates.encryptedAuthState);
+       } catch (e) {}
+    }
+    const setDoc = { ...updates, ...extra, updatedAt: Date.now() };
+
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return;
-      const extra: any = {};
-      if (updates.uid !== undefined) extra.facebookUID = updates.uid;
-      if (updates.slotId !== undefined) extra.botSlotId = updates.slotId;
-      if (updates.ownerId !== undefined) extra.ownerUserId = updates.ownerId;
-      if (updates.displayName !== undefined) extra.accountName = updates.displayName;
-      if (updates.encryptedAuthState !== undefined) {
-         try {
-           extra.cookie = decryptPassword(updates.encryptedAuthState);
-         } catch (e) {}
-      }
       await MessengerAccountModel.updateOne(
         { accountId },
-        { $set: { ...updates, ...extra, updatedAt: Date.now() } }
+        { $set: setDoc }
       );
-    } catch (err) {
-      console.error(`Failed to update Messenger account ${accountId}:`, err);
+    } catch (err: any) {
+      console.warn(`[DATABASE] Model update error for ${accountId}, falling back:`, err?.message || err);
+      try {
+        executeFallback('MessengerAccount', 'updateOne', [
+          { accountId },
+          { $set: setDoc }
+        ]);
+      } catch (fbErr) {
+        console.error(`Failed to update Messenger account fallback ${accountId}:`, fbErr);
+      }
     }
   },
 
   delete: async (accountId: string): Promise<boolean> => {
     try {
       await ensureDb();
-      if (mongoose.connection.readyState !== 1) return false;
       const res = await MessengerAccountModel.deleteOne({ accountId });
       return res.deletedCount > 0;
     } catch {
@@ -1226,8 +1240,15 @@ export const telegramConfigData = {
         { $set: { ...cachedTelegramConfig, updatedAt: Date.now() } },
         { upsert: true }
       );
-    } catch (err) {
-      console.warn('[Database] Failed to upsert Telegram config to MongoDB:', (err as any)?.message);
+    } catch (err: any) {
+      console.warn('[Database] Telegram config upsert to MongoDB failed, updating fallback DB:', err?.message || err);
+      try {
+        executeFallback('TelegramConfig', 'updateOne', [
+          { configId: 'primary' },
+          { $set: { ...cachedTelegramConfig, updatedAt: Date.now() } },
+          { upsert: true }
+        ]);
+      } catch {}
     }
     return { ...cachedTelegramConfig };
   }

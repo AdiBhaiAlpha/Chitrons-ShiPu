@@ -25,6 +25,15 @@ export function getCustomRequire(): NodeRequire {
 }
 
 export async function loadFCAModule(packageName: string): Promise<any> {
+  // Enforce autoUpdate: false globally so no FCA library triggers npm install or process.exit(1)
+  const g = globalThis as any;
+  if (!g.fca) g.fca = {};
+  if (!g.fca.config) {
+    g.fca.config = { autoUpdate: false, mqtt: { enabled: true, reconnectInterval: 3600 } };
+  } else {
+    g.fca.config.autoUpdate = false;
+  }
+
   let mod: any = null;
 
   // Attempt 1: Node createRequire

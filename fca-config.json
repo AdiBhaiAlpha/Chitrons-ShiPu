@@ -6,7 +6,7 @@
     "notifyIfCurrent": false,
     "packageName": "@dongdev/fca-unofficial",
     "registryUrl": "https://registry.npmjs.org",
-    "timeoutMs": 10000
+    "timeoutMs": 5000
   },
   "mqtt": {
     "enabled": true,

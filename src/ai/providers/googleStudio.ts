@@ -68,39 +68,22 @@ export class GoogleAIStudioProvider implements AIProvider {
     return keys[0] || '';
   }
 
+  private static unsupportedModels = new Set<string>();
+
   private getModels(): string[] {
     const configuredModel = process.env.AI_MODEL?.trim();
     
-    // Hierarchical tier list of Gemini models requested by the user, ordered from highest capability to lowest capability
+    // Hierarchical tier list of Gemini models ordered for fast response and high availability
     const defaultList = [
-      // 1. Frontier / Advanced Reasoning (Gemini 3/3.5/3.6 Pro)
-      'gemini-3.6-pro',
-      'gemini-3.5-pro',
-      
-      // 2. High Performance / General (Gemini 3/3.5/3.6 Flash)
       'gemini-3.6-flash',
-      'gemini-3.5-flash',
-      
-      // 3. Ultra-fast automation (Gemini 3.5 Flash-Lite / Cyber)
-      'gemini-3.5-flash-lite',
-      'gemini-3.5-flash-lite-cyber',
-      'gemini-3.5-flash-cyber',
-      
-      // 4. Stable 2.5 Production / Pro-Flash
-      'gemini-2.5-pro',
+      'gemini-3.8-flash',
+      'gemini-3-flash-preview',
+      'gemini-flash-latest',
+      'gemini-3.1-pro-preview',
       'gemini-2.5-flash',
-      
-      // 5. Stable 2.0 Production / Pro-Flash
-      'gemini-2.0-pro',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-      
-      // 6. Legacy 1.5 Pro
-      'gemini-1.5-pro',
-      
-      // 7. Legacy 1.5 Flash / Flash-8B
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-8b'
+      'gemini-2.5-pro',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite'
     ];
 
     if (configuredModel && !defaultList.includes(configuredModel)) {
@@ -126,7 +109,7 @@ export class GoogleAIStudioProvider implements AIProvider {
 
     const modelsToTry = this.getModels();
     let lastError: any = null;
-    const unsupportedModels = new Set<string>();
+    const unsupportedModels = GoogleAIStudioProvider.unsupportedModels;
 
     // Try primary models across available keys first before falling back to lower tier models
     for (const model of modelsToTry) {
@@ -549,9 +532,9 @@ export class GoogleAIStudioProvider implements AIProvider {
       }
     }
 
-    // Set a 30 second timeout
+    // Set a 12 second timeout for fast failover
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       const res = await fetch(url, {

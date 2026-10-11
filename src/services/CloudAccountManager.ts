@@ -340,14 +340,47 @@ export class CloudAccountManager {
           if (operationType === 'insert') {
             const doc = change.fullDocument;
             if (doc && doc.accountId) {
+              const isEnabled = (doc.botEnabled ?? true) && (doc.enabled ?? true);
+              this.knownAccountState.set(doc.accountId, {
+                updatedAt: doc.updatedAt || Date.now(),
+                encryptedState: doc.encryptedAuthState || '',
+                enabled: isEnabled
+              });
               messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected new account [${doc.accountId}] added to MongoDB remotely`);
-              await this.startAccount(doc.accountId);
+              if (isEnabled) {
+                await this.startAccount(doc.accountId);
+              }
             }
           } else if (operationType === 'update' || operationType === 'replace') {
             const doc = change.fullDocument;
             if (doc && doc.accountId) {
-              messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected configuration change for account [${doc.accountId}]`);
-              await this.reloadAccount(doc.accountId);
+              const cached = this.knownAccountState.get(doc.accountId);
+              const isEnabled = (doc.botEnabled ?? true) && (doc.enabled ?? true);
+              const cookieChanged = !cached || cached.encryptedState !== doc.encryptedAuthState;
+              const enabledChanged = !cached || cached.enabled !== isEnabled;
+
+              this.knownAccountState.set(doc.accountId, {
+                updatedAt: doc.updatedAt || Date.now(),
+                encryptedState: doc.encryptedAuthState || '',
+                enabled: isEnabled
+              });
+
+              if (!isEnabled && enabledChanged) {
+                messengerLogger.info('CLOUD_SYNC', `Account [${doc.accountId}] was disabled in database. Stopping runtime...`);
+                await this.stopAccount(doc.accountId);
+              } else if (cookieChanged) {
+                messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected cookie update for account [${doc.accountId}]. Re-authenticating...`);
+                await this.reloadAccount(doc.accountId, true);
+              } else if (enabledChanged && isEnabled) {
+                messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected account [${doc.accountId}] enabled in database. Starting...`);
+                await this.startAccount(doc.accountId);
+              } else {
+                // Non-auth update (e.g. status, mqttStatus, heartbeat, or AI flags) — update in-memory record without resetting session
+                const conn = MultiAccountManager.getInstance().getAccountConnection(doc.accountId);
+                if (conn) {
+                  conn.updateRecord(doc);
+                }
+              }
             }
           } else if (operationType === 'delete') {
             const documentKey = change.documentKey;
@@ -405,27 +438,32 @@ export class CloudAccountManager {
               await this.startAccount(record.accountId);
             }
           } else {
-            // Check if document was modified
+            // Check if document auth state or enabled flag was modified (ignore pure heartbeat/status timestamp updates)
             const cookieChanged = cached.encryptedState !== record.encryptedAuthState;
             const enabledChanged = cached.enabled !== isEnabled;
-            const timestampChanged = record.updatedAt > cached.updatedAt + 1000;
 
-            if (cookieChanged || enabledChanged || timestampChanged) {
-              messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected update for account [${record.accountId}]`);
-              this.knownAccountState.set(record.accountId, {
-                updatedAt: record.updatedAt,
-                encryptedState: record.encryptedAuthState,
-                enabled: isEnabled
-              });
+            this.knownAccountState.set(record.accountId, {
+              updatedAt: record.updatedAt,
+              encryptedState: record.encryptedAuthState,
+              enabled: isEnabled
+            });
+
+            if (cookieChanged || enabledChanged) {
+              messengerLogger.info('CLOUD_SYNC', `Cloud Sync detected configuration update for account [${record.accountId}]`);
 
               if (!isEnabled) {
                 messengerLogger.info('CLOUD_SYNC', `Account [${record.accountId}] was disabled in database. Stopping runtime...`);
                 await this.stopAccount(record.accountId);
               } else if (cookieChanged) {
                 messengerLogger.info('CLOUD_SYNC', `Cookie changed for account [${record.accountId}]. Re-authenticating...`);
-                await this.reloadAccount(record.accountId);
+                await this.reloadAccount(record.accountId, true);
               } else {
                 await this.startAccount(record.accountId);
+              }
+            } else {
+              const conn = MultiAccountManager.getInstance().getAccountConnection(record.accountId);
+              if (conn) {
+                conn.updateRecord(record);
               }
             }
           }
@@ -513,11 +551,25 @@ export class CloudAccountManager {
     }
     messengerLogger.success('CLOUD_SYNC', `[Account ${accountId}] Cookie validated`);
 
+    // Register known state before status sync so ChangeStream / polling knows this state
+    const isEnabled = (record.botEnabled ?? true) && (record.enabled ?? true);
+    this.knownAccountState.set(accountId, {
+      updatedAt: Date.now(),
+      encryptedState: record.encryptedAuthState,
+      enabled: isEnabled
+    });
+
     // Register AccountConnection if missing
     if (!connection) {
       connection = new AccountConnection(record);
       connection.registerEventListener((evt) => {
-        if (evt) connection?.recordIncomingMessage();
+        if (evt && (evt.type === 'message' || evt.type === 'message_reply' || Boolean(evt.body))) {
+          connection?.recordIncomingMessage(
+            String(evt.threadID || evt.thread_fbid || ''),
+            String(evt.senderID || evt.senderId || evt.author || ''),
+            String(evt.messageID || evt.messageId || '')
+          );
+        }
       });
       multiMgr.addAccountConnection(accountId, connection);
     } else {
@@ -534,6 +586,11 @@ export class CloudAccountManager {
         loginStatus: 'LOGGED_IN',
         lastSuccessfulLogin: Date.now(),
         provider: connection.activeProviderName || record.provider
+      });
+      this.knownAccountState.set(accountId, {
+        updatedAt: Date.now(),
+        encryptedState: record.encryptedAuthState,
+        enabled: isEnabled
       });
       messengerLogger.success('CLOUD_SYNC', `[Account ${accountId}] Database updated & status marked AI_READY`);
       return true;
@@ -582,29 +639,35 @@ export class CloudAccountManager {
   /**
    * 6. reloadAccount(): Hot reloads config or updates cookie session.
    */
-  public async reloadAccount(accountId: string): Promise<boolean> {
+  public async reloadAccount(accountId: string, forceReauth = false): Promise<boolean> {
     messengerLogger.info('CLOUD_SYNC', `Hot-reloading configuration for account [${accountId}]...`);
     
-    // Safely disconnect previous database before reconnecting
-    try {
-      const { dynamicDbManager } = await import('./DynamicDbManager');
-      await dynamicDbManager.disconnectBotDb(accountId);
-    } catch (err: any) {
-      messengerLogger.error('CLOUD_SYNC', `Error disconnecting database during reload for account [${accountId}]: ${err.message}`);
-    }
-
     const record = await messengerAccountsData.get(accountId);
     if (!record) return false;
 
     const multiMgr = MultiAccountManager.getInstance();
     const connection = multiMgr.getAccountConnection(accountId);
 
-    if (connection) {
-      // Clear cached session state so fresh authentication occurs
-      connection.resetSession();
+    const cookieChanged = connection ? connection.encryptedAuthState !== record.encryptedAuthState : true;
+
+    if (forceReauth || cookieChanged) {
+      // Safely disconnect previous database before reconnecting
+      try {
+        const { dynamicDbManager } = await import('./DynamicDbManager');
+        await dynamicDbManager.disconnectBotDb(accountId);
+      } catch (err: any) {
+        messengerLogger.error('CLOUD_SYNC', `Error disconnecting database during reload for account [${accountId}]: ${err.message}`);
+      }
+
+      if (connection) {
+        // Clear cached session state and stop old listener so fresh authentication occurs cleanly
+        connection.resetSession();
+      }
+    } else if (connection) {
+      connection.updateRecord(record);
     }
 
-    return this.startAccount(accountId);
+    return this.startAccount(accountId, record);
   }
 
   /**

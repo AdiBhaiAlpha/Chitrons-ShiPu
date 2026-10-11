@@ -1140,10 +1140,14 @@ class ShiPuBotEngine {
       messengerLogger.warn('COMMAND', `Unknown command "${commandName}" called`);
       messengerLogger.updatePipelineStage('cmd_router', 'failed', `Unknown command ${commandName}`);
       this.addLog('warn', `Unknown command "${commandName}" called in ${thread.name}`, 'CommandRouter');
+      const notFoundMsg = `❌ Command "${commandName}" not found. Type ${prefix}help for available commands.`;
+      if (realFcaApi) {
+        await replyApi.reply(notFoundMsg);
+      }
       return {
         messageID,
         threadID,
-        body: `❌ Command "${commandName}" not found. Type ${prefix}help for available commands.`,
+        body: notFoundMsg,
         timestamp: Date.now(),
         senderName: this.config.botName
       };
@@ -1154,10 +1158,14 @@ class ShiPuBotEngine {
 
     if (plugin.config.enabled === false) {
       messengerLogger.warn('COMMAND', `Command "${commandName}" is disabled`);
+      const disabledMsg = `⚠️ Command "${commandName}" is currently disabled by administrator.`;
+      if (realFcaApi) {
+        await replyApi.reply(disabledMsg);
+      }
       return {
         messageID,
         threadID,
-        body: `⚠️ Command "${commandName}" is currently disabled by administrator.`,
+        body: disabledMsg,
         timestamp: Date.now(),
         senderName: this.config.botName
       };
@@ -1166,10 +1174,14 @@ class ShiPuBotEngine {
     if (user.role < plugin.config.role) {
       messengerLogger.warn('COMMAND', `Permission denied for command "${commandName}"`);
       const rolesMap = ['Normal User', 'Group Admin', 'Bot Admin', 'Bot Owner'];
+      const deniedMsg = `🔒 Permission Denied! This command requires [${rolesMap[plugin.config.role]}] role or higher.`;
+      if (realFcaApi) {
+        await replyApi.reply(deniedMsg);
+      }
       return {
         messageID,
         threadID,
-        body: `🔒 Permission Denied! This command requires [${rolesMap[plugin.config.role]}] role or higher.`,
+        body: deniedMsg,
         timestamp: Date.now(),
         senderName: this.config.botName
       };
@@ -1188,7 +1200,7 @@ class ShiPuBotEngine {
         const allowedLimitedCommands = new Set([
           'rent', 'payrent', 'autorenew', 'balance', 'bal', 'money', 'wallet',
           'daily', 'work', 'deposit', 'withdraw', 'bank', 'topbal', 'help',
-          'support', 'info', 'ping', 'uptime'
+          'support', 'info', 'ping', 'uptime', 'shipu', 'ai', 'ask', 'resetai', 'memory'
         ]);
 
         if (!allowedLimitedCommands.has(cmdLower)) {
@@ -1204,6 +1216,10 @@ class ShiPuBotEngine {
             `⚠️ All premium bot commands are locked until subscription is renewed.\n` +
             `👉 Run \`#payrent 1\` to renew your subscription for 1 week (1,000 Coins).\n` +
             `👉 Run \`#rent\` to check your full subscription details.`;
+
+          if (realFcaApi) {
+            await replyApi.reply(renewalMsg);
+          }
 
           return {
             messageID,
@@ -1225,10 +1241,14 @@ class ShiPuBotEngine {
 
     if (now - lastExecution < cooldownMs) {
       const remainingSecs = Math.ceil((cooldownMs - (now - lastExecution)) / 1000);
+      const cooldownMsg = `⏳ Please wait ${remainingSecs}s before using ${plugin.config.name} again.`;
+      if (realFcaApi) {
+        await replyApi.reply(cooldownMsg);
+      }
       return {
         messageID,
         threadID,
-        body: `⏳ Please wait ${remainingSecs}s before using ${plugin.config.name} again.`,
+        body: cooldownMsg,
         timestamp: Date.now(),
         senderName: this.config.botName
       };
@@ -1256,6 +1276,9 @@ class ShiPuBotEngine {
       let finalBody = '';
       if (result && typeof result === 'object' && result.body) {
         finalBody = result.body;
+        if (capturedReplies.length === 0 && realFcaApi) {
+          await replyApi.reply(finalBody);
+        }
       } else if (capturedReplies.length > 0) {
         finalBody = capturedReplies.join('\n\n');
       }

@@ -317,7 +317,13 @@ export class ClientBotsManager {
       if (!connection) {
         connection = new AccountConnection(dbRecord);
         connection.registerEventListener((evt) => {
-          if (evt) connection?.recordIncomingMessage();
+          if (evt && (evt.type === 'message' || evt.type === 'message_reply' || Boolean(evt.body))) {
+            connection?.recordIncomingMessage(
+              String(evt.threadID || evt.thread_fbid || ''),
+              String(evt.senderID || evt.senderId || evt.author || ''),
+              String(evt.messageID || evt.messageId || '')
+            );
+          }
         });
         multiMgr.addAccountConnection(accountId, connection);
       } else {

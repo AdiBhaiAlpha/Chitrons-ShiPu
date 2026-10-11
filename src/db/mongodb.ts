@@ -157,10 +157,28 @@ class DummyChangeStream {
   }
 }
 
-const isMongoConnectionError = (err: any): boolean => {
+export const isMongoConnectionError = (err: any): boolean => {
   if (!err) return false;
+  const errName = String(err.name || '');
   const errMsg = String(err.message || err).toLowerCase();
+  const errStack = String(err.stack || '').toLowerCase();
   return (
+    errName === 'MongoNetworkError' ||
+    errName === 'MongoServerSelectionError' ||
+    errName === 'MongoNetworkTimeoutError' ||
+    errName === 'MongoTopologyClosedError' ||
+    errName === 'MongoNotConnectedError' ||
+    errName === 'MongooseError' ||
+    errName === 'MongooseServerSelectionError' ||
+    errName === 'MongoTimeoutError' ||
+    errName === 'MongoError' ||
+    errName === 'MongoDriverError' ||
+    errMsg.includes('ssl routines') ||
+    errMsg.includes('alert internal error') ||
+    errMsg.includes('alert number') ||
+    errMsg.includes('ssl alert') ||
+    errMsg.includes('resetpool') ||
+    errMsg.includes('errorlabelset') ||
     errMsg.includes('selection timed out') ||
     errMsg.includes('connection timed out') ||
     errMsg.includes('timeout') ||
@@ -173,13 +191,22 @@ const isMongoConnectionError = (err: any): boolean => {
     errMsg.includes('before initial connection is complete') ||
     errMsg.includes('client must be connected') ||
     errMsg.includes('cooldown') ||
-    err.name === 'MongoServerSelectionError' ||
-    err.name === 'MongoNetworkTimeoutError' ||
-    err.name === 'MongooseError'
+    errMsg.includes('econnrefused') ||
+    errMsg.includes('enotfound') ||
+    errMsg.includes('etimedout') ||
+    errMsg.includes('ehostunreach') ||
+    errMsg.includes('econnreset') ||
+    errMsg.includes('connection closed') ||
+    errMsg.includes('pool destroyed') ||
+    errMsg.includes('not connected') ||
+    errMsg.includes('no connection') ||
+    errMsg.includes('offline') ||
+    errStack.includes('mongonetworkerror') ||
+    errStack.includes('ssl alert')
   );
 };
 
-function executeFallback(modelName: string, prop: string, args: any[]): any {
+export function executeFallback(modelName: string, prop: string, args: any[]): any {
   const p = prop;
   if (p === 'find') {
     const col = fallbackDb.getCollection(modelName);
@@ -303,7 +330,7 @@ function wrapQueryOrPromise(result: any, fallbackExec: () => any): any {
           return Promise.resolve()
             .then(() => target)
             .catch(err => {
-              if (isMongoConnectionError(err)) {
+              if (isMongoConnectionError(err) || mongoose.connection.readyState !== 1) {
                 return fallbackExec();
               }
               throw err;
@@ -319,7 +346,7 @@ function wrapQueryOrPromise(result: any, fallbackExec: () => any): any {
           return Promise.resolve()
             .then(() => target)
             .catch(err => {
-              if (isMongoConnectionError(err)) {
+              if (isMongoConnectionError(err) || mongoose.connection.readyState !== 1) {
                 return fallbackExec();
               }
               throw err;
@@ -336,7 +363,7 @@ function wrapQueryOrPromise(result: any, fallbackExec: () => any): any {
           try {
             originalExecPromise = target.exec();
           } catch (err) {
-            if (isMongoConnectionError(err)) {
+            if (isMongoConnectionError(err) || mongoose.connection.readyState !== 1) {
               return Promise.resolve(fallbackExec());
             }
             throw err;
@@ -552,7 +579,11 @@ function getDynamicModel(modelName: string, schema: mongoose.Schema, defaultColl
 let isConnected = false;
 let connectionError: string | null = null;
 let lastAttemptTime = 0;
-const RECONNECT_COOLDOWN_MS = 5000; // 5 seconds cooldown
+let reconnectAttempts = 0;
+function getReconnectCooldown(): number {
+  if (reconnectAttempts === 0) return 10000;
+  return Math.min(15000 * Math.pow(1.8, Math.min(reconnectAttempts - 1, 5)), 120000);
+}
 
 const userSchema = new mongoose.Schema({
   userID: { type: String, required: true, unique: true },
@@ -1303,7 +1334,8 @@ export async function connectMongoDB(): Promise<{ connected: boolean; error?: st
   }
 
   const now = Date.now();
-  if (now - lastAttemptTime < RECONNECT_COOLDOWN_MS) {
+  const cooldown = getReconnectCooldown();
+  if (now - lastAttemptTime < cooldown) {
     return { connected: false, error: connectionError || 'MongoDB Atlas offline (fallback mode active)' };
   }
 
@@ -1320,6 +1352,7 @@ export async function connectMongoDB(): Promise<{ connected: boolean; error?: st
     });
     isConnected = true;
     connectionError = null;
+    reconnectAttempts = 0;
 
     console.log('[SUCCESS][DATABASE] MongoDB Atlas connection established successfully');
     console.log('[SUCCESS][DATABASE] Mongoose connection ready and verified');
@@ -1456,6 +1489,7 @@ export async function connectMongoDB(): Promise<{ connected: boolean; error?: st
     return { connected: true };
   } catch (err: any) {
     isConnected = false;
+    reconnectAttempts++;
     await mongoose.disconnect().catch(() => {});
     // Sanitize any potential sensitive credentials in error message
     const rawError = err?.message || 'MongoDB connection failed';
